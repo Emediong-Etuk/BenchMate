@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CaptionStrip } from "@/components/bench/CaptionStrip";
 import { DebugPanel } from "@/components/bench/DebugPanel";
 import { StatusPill } from "@/components/bench/StatusPill";
-import { LevelMeter } from "@/components/ui/LevelMeter";
+import { VoiceLevelMeter } from "@/components/bench/VoiceLevelMeter";
 import { DEFAULT_VOICE_SETTINGS, buildDevSessionConfig, type VoiceSettings } from "@/lib/agent/devSessionConfig";
 import { ENGLISH_VOICES } from "@/lib/agent/voices";
 import { useVoiceStore } from "@/lib/store/voiceStore";
@@ -124,7 +124,7 @@ export function VoiceCheck() {
 
           <div className="grid gap-2">
             <span className="text-sm text-muted">Mic level</span>
-            <LevelMeter />
+            <VoiceLevelMeter />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
