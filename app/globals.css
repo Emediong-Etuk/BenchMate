@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* Calm "lab instrument" palette: neutral surfaces, one accent (teal). */
+:root {
+  --bg: #f6f7f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f2;
+  --border: #d9dde1;
+  --text: #15191d;
+  --muted: #5b6570;
+  --accent: #0f766e;
+  --accent-soft: #ccfbf1;
+  --good: #15803d;
+  --warn: #b45309;
+  --bad: #b91c1c;
+  --measure: #1d4ed8;
+  --deviation: #b45309;
+  --observation: #4b5563;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1113;
+    --surface: #161a1d;
+    --surface-2: #1e2327;
+    --border: #2c3338;
+    --text: #e8ecef;
+    --muted: #97a3ad;
+    --accent: #2dd4bf;
+    --accent-soft: #123b37;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --measure: #60a5fa;
+    --deviation: #fbbf24;
+    --observation: #9ca3af;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-measure: var(--measure);
+  --color-deviation: var(--deviation);
+  --color-observation: var(--observation);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes soft-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 35%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, currentColor 0%, transparent); }
+}
+.pulse-ring { animation: soft-pulse 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring { animation: none; }
+}
+
+@media print {
+  :root { --bg: #fff; --surface: #fff; --text: #000; --muted: #333; --border: #999; }
+  .no-print { display: none !important; }
+}

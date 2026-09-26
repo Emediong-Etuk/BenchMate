@@ -22,6 +22,9 @@ Legend: ✅ verified (docs + probe) · 📄 docs only · ⚠️ contradicts the 
 | C8 | Flush playback only on `reply.done(interrupted)` | 📄 The turn-detection docs also flush on `input.speech.started` ("snappiest barge-in"), and the starter does the same. But back-channels ("uh-huh") also start speech and **don't** interrupt, so flushing there would drop audio from a reply that keeps going (manual test step 3). | On `input.speech.started`: **duck** agent audio to ~15% gain (instant perceived barge-in). On `reply.done(interrupted)`: hard flush. If the reply isn't interrupted (no `reply.done(interrupted)` ~600 ms after `input.speech.stopped`), restore gain. |
 | C9 | Brief's system prompt is used verbatim | 📄 The tools docs call few-shot examples in the system prompt "the strongest behavioural signal". Probe: with a minimal prompt, "Go to step 2." produced `navigate_protocol({action:"current"})` with no `step_number`, and the agent paraphrased the step ("The current step is to add fifty…") instead of "Step 2. …" verbatim. | Keep the brief's prompt and add a short few-shot block + the docs' default-to-call line. **See Q3.** |
 
+| C10 | `conversation.message` injects context (dev text box, reconnect summary, keyboard-nav notices) | ⚠️ **Found in Phase 1: it has no observable effect.** Probes: `conversation.message {role:"user"}` + `reply.create` gets a generic reply ("I am ready to assist you…") that ignores the content. Same with `role:"system"`, with an 800–1500 ms gap before `reply.create`, and when later asked to recall it ("My name is Priya" → "I do not know your name"). `reply.create {instructions}` **does** work, including tool routing ("go to step 5" typed → `navigate_protocol {action:"goto", step_number:5}` → verbatim read). | Typed utterances go in `reply.create.instructions` ("The user typed this instead of speaking: …"). State context for the agent (reconnect summary, keyboard navigation) goes in the **mutable `system_prompt`** via `session.update`, not `conversation.message`. Phase 3 and 6 are designed around this. |
+| C11 | Agent reads numbers correctly by default | ⚠️ Probe: with step text "Spin the tubes for 1 minute at 13,000 x g." the spoken transcript was "…at 1 3 0 0 0 x g." | Phase 3: tool results include a speakable form of each step (thousands separators expanded, e.g. "13,000 x g" → "thirteen thousand times g") next to the exact `step_text`. The prompt tells the agent to read the speakable form. The notebook keeps the exact text. |
+
 ## 2. Verified facts
 
 ### Auth / tokens
@@ -83,6 +86,10 @@ Legend: ✅ verified (docs + probe) · 📄 docs only · ⚠️ contradicts the 
 ### Tooling versions (npm, today)
 next 16.3.6 · react 19.3.0 · tailwindcss 4.3.3 · zustand 5.0.15 · zod 4.6.5 · ajv 8.20.0 · vitest 5.0.2 · typescript 7.0.2 · eslint 10.11.0.
 TypeScript 7 is the native port. If `next build`'s type check or typescript-eslint doesn't support it yet, I'll pin the latest 5.x/6.x. I'll check in Phase 1.
+
+### Browser testing in this container
+- Headless Chromium here can't trust the sandbox's TLS-intercepting egress CA (its NSS store is empty and there's no `certutil`). For automated end-to-end runs, the Playwright harness (scratchpad only, not a project dependency) bridges the page's WebSocket through Node, which trusts the CA bundle. The page code is unchanged. Real browsers on real networks connect directly.
+- Fake mic: `--use-file-for-fake-audio-capture=<wav>` with a WAV recorded from the agent's own TTS gives a real spoken test utterance.
 
 ## 3. Open questions → PLAN.md §Open questions
 Q1 LLM Gateway model access · Q2 resume behaviour · Q3 prompt few-shot addition · Q4 the API key pasted in chat.

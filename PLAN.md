@@ -85,8 +85,8 @@ benchmate/
 3. **Barge-in (NOTES C8).** Duck on `input.speech.started`, flush on `reply.done(interrupted)`, restore if not interrupted.
 4. **Captions (NOTES §2 events).** Agent words are revealed by `start_ms` relative to when that reply's first buffer actually starts playing. They're cleared on flush.
 5. **Status pill** is a pure function of (socket state, last events, pending results, `playback.isPlaying`, muted), so it's testable.
-6. **Recovery (NOTES C5).** On an unexpected close: Reconnecting → fresh token → try `session.resume` once → on any resume error (or 1006) → fresh session with the reconnect greeting + a `conversation.message{role:"system"}` state summary. Retryable errors back off 1/2/4/8 s, then a manual Retry button. Rollover at `expires_at − 5 min` at the next idle moment.
-7. **Keyboard/debug actions go through the same handlers.** Arrow-key navigation calls `navigate_protocol`'s handler directly, then informs the agent via `conversation.message{role:"system"}` (no reply).
+6. **Recovery (NOTES C5).** On an unexpected close: Reconnecting → fresh token → try `session.resume` once → on any resume error (or 1006) → fresh session with the reconnect greeting and the state summary built into `system_prompt` (`conversation.message` is a no-op, NOTES C10). Retryable errors back off 1/2/4/8 s, then a manual Retry button. Rollover at `expires_at − 5 min` at the next idle moment.
+7. **Keyboard/debug actions go through the same handlers.** Arrow-key navigation calls `navigate_protocol`'s handler directly, then informs the agent by updating `system_prompt` with the new position via `session.update` (NOTES C10).
 8. **Voice defaults:** voice `alba`, `transcription_mode: balanced`, `voice_focus: far-field`, noise suppression off (NOTES C1–C3).
 
 ## Phases and acceptance checks
@@ -98,7 +98,7 @@ Each phase ends with `npm run typecheck && npm run lint && npm test` green, a co
 - `/api/voice-token` (Bearer key, 120 s / 10800 s, in-memory rate limit 10 per IP per 10 min).
 - `pcm.ts` + tests. Capture worklet (24 kHz on Chromium, resample otherwise). `playback.ts` (scheduling, GainNode, duck, flush, "is playing" tracking).
 - `events.ts` zod schemas. `VoiceClient` with a minimal prompt: connect, 12 s ready guard, mic streaming after ready, mute, `session.end` on stop and on `pagehide`.
-- A temporary `/bench` dev view: status pill, captions, debug panel (event log without audio bodies, typed-utterance box → `conversation.message` + `reply.create`).
+- A temporary `/bench` dev view: status pill, captions, debug panel (event log without audio bodies, typed-utterance box → `reply.create` instructions, see NOTES C10).
 - `npm run check:secrets`.
 - ✅ Talk to it over laptop speakers without self-interruption · ✅ barge-in cuts audio instantly · ✅ check:secrets passes.
 - Headless Chrome can't do real mic tests. I'll verify the text harness and API flow here; the speaker/mic checks need you on a real laptop.
