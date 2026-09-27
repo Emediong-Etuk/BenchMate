@@ -35,6 +35,8 @@ type EntryBase = {
   stepNumber: number;
   sourceUtterance: string;
   callId: string;
+  /** Entries from one user utterance share this (several calls may make them); "scratch that" voids the group. */
+  groupId?: string;
   status: "pending" | "confirmed" | "unconfirmed" | "voided";
   voidedAt?: string;
 };

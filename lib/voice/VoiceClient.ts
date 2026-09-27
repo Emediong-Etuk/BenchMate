@@ -175,8 +175,12 @@ export class VoiceClient {
     this.send({ type: "session.update", session });
   }
 
-  /** Clean end: session.end → wait for session.ended (max 3 s) → cleanup. */
-  async end(): Promise<void> {
+  /**
+   * Clean end: session.end → wait for session.ended (max 3 s) → cleanup.
+   * With drain, first let already-received speech finish playing (max 12 s).
+   */
+  async end(opts: { drain?: boolean } = {}): Promise<void> {
+    if (opts.drain) await this.waitForPlaybackIdle(12_000);
     const ws = this.ws;
     if (ws && ws.readyState === WebSocket.OPEN && !this.sessionEnded) {
       const ended = new Promise<void>((resolve) => {
@@ -191,6 +195,21 @@ export class VoiceClient {
     await this.capture.stop();
     this.playback.flush();
     this.setState("ended");
+  }
+
+  private waitForPlaybackIdle(maxMs: number): Promise<void> {
+    if (!this.playback.isPlaying) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(done, maxMs);
+      const off = this.playback.onPlayingChange((p) => {
+        if (!p) done();
+      });
+      function done() {
+        clearTimeout(timer);
+        off();
+        resolve();
+      }
+    });
   }
 
   /** Synchronous best-effort end for pagehide (docs: no async work there). */

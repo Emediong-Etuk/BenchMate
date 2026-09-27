@@ -2,7 +2,7 @@
 
 Hands-free voice lab assistant built on the AssemblyAI Voice Agent API. See `PLAN.md` for the build plan and `NOTES.md` for verified API behaviour.
 
-> Work in progress: Phases 1 (voice loop) and 2 (protocols, Home, Setup) complete.
+> Work in progress: Phases 1–3 complete (voice loop; protocols, Home, Setup; tools and hands-free bench mode).
 
 ## Setup
 
@@ -25,6 +25,23 @@ Use Chrome or Edge. The microphone needs `localhost` or HTTPS.
 | `npm test` | Vitest unit tests |
 | `npm run check:secrets` | After a build: fails if the API key or its variable name is in client-facing output |
 | `npm run probe` | Logs real Voice Agent API payloads (`scripts/probe-voice.mjs`) |
+
+## Manual voice test script (run before the demo)
+
+1. "Start" → reads step 1 verbatim.
+2. Interrupt mid-read with "wait, stop" → audio cuts immediately.
+3. "Uh-huh" while it's reading → it keeps going (back-channel).
+4. "Next" ×2, "go back", "go to step 5", "where am I".
+5. "Sample two, 245 nanograms per microliter, 260 over 280 is 1.86" → two entries, correct readback.
+6. "No, 254 not 245" → void + re-log + corrected readback.
+7. "Done, but I spun for three minutes instead of one" → deviation logged, then advances.
+8. "Tube four looks cloudy" → observation.
+9. "One-minute timer" → countdown; talk during the last seconds and confirm the announcement waits until you finish.
+10. Kill Wi-Fi for 10 s → Reconnecting → resumes or restarts with state intact.
+11. Reload the page mid-run → state restored.
+12. "I'm done" → confirmation → entry page with everything correct. Repeat 5 and 9 with a running fan or white-noise video nearby to simulate a centrifuge.
+
+Keyboard fallbacks on the bench screen: Space mute, ← → steps, T type instead of speaking, D debug panel.
 
 ## Testing the parser's safety net
 

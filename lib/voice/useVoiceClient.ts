@@ -55,8 +55,14 @@ export function useVoiceClient(extra: Partial<VoiceClientHandlers> = {}): RefObj
     };
 
     const client = new VoiceClient({
-      onConnection: (state, message) => store().setConnection(state, message),
-      onEvent: (ev) => store().applyEvent(ev),
+      onConnection: (state, message) => {
+        store().setConnection(state, message);
+        extraRef.current.onConnection?.(state, message);
+      },
+      onEvent: (ev) => {
+        store().applyEvent(ev);
+        extraRef.current.onEvent?.(ev);
+      },
       onLog,
       onPlayingChange: (p) => store().setPlaying(p),
       onMicLevel: (l) => store().setMicLevel(l),

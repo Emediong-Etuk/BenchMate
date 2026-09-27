@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import { VoiceCheck } from "./VoiceCheck";
+import { BenchClient } from "@/components/bench/BenchClient";
 
 export const metadata: Metadata = { title: "Bench · BenchMate" };
 
-// Phase 1: voice-loop harness. The full hands-free bench screen replaces
-// this in Phase 3.
 export default function BenchPage() {
-  return <VoiceCheck />;
+  return <BenchClient />;
 }
