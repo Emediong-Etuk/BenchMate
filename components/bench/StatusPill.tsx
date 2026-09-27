@@ -27,9 +27,9 @@ export function StatusPill() {
     <span
       role="status"
       aria-live="polite"
-      className={`inline-flex min-h-11 items-center gap-2 rounded-full border-2 bg-surface px-4 text-base font-semibold ${toneClass[tone]}`}
+      className={`inline-flex min-h-14 items-center gap-3 rounded-full border-2 bg-surface px-5 text-xl font-semibold ${toneClass[tone]}`}
     >
-      <span className={`h-3 w-3 rounded-full bg-current ${statusPulses(status) ? "pulse-ring" : ""}`} aria-hidden />
+      <span className={`h-4 w-4 rounded-full bg-current ${statusPulses(status) ? "pulse-ring" : ""}`} aria-hidden />
       {status}
     </span>
   );

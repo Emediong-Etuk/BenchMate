@@ -155,7 +155,14 @@ export function BenchClient() {
         </div>
       )}
 
-      {!live && !reconnecting && (
+      {connecting && hasHistory && (
+        <div role="status" className="flex items-center gap-3 rounded-2xl border-2 border-accent bg-accent-soft px-6 py-3 text-lg">
+          <span className="h-5 w-5 animate-spin rounded-full border-4 border-accent border-t-transparent" aria-hidden />
+          Reconnecting to pick up where you left off…
+        </div>
+      )}
+
+      {!live && !reconnecting && !(connecting && hasHistory) && (
         <section className="flex flex-wrap items-center gap-4 rounded-3xl border-2 border-accent bg-surface p-6">
           <button
             type="button"

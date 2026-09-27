@@ -1,5 +1,9 @@
 # BenchMate: build plan
 
+## Status
+
+Phases 0–7 built and verified (see the commit history and README). Remaining: deploy to Vercel (needs the owner's Vercel account) and the real-laptop checks listed in the README.
+
 Read with `NOTES.md` (verified API facts and the contradictions with the brief). **Waiting for approval before Phase 1.**
 
 ## Dependencies (unchanged from brief §3, no additions)
