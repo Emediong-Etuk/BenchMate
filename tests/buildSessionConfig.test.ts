@@ -46,10 +46,28 @@ describe("renderSystemPrompt", () => {
     expect(p).not.toMatch(/\{\{/);
   });
 
+  it("includes a recent-log and running-timer summary for reconnects", () => {
+    const s = {
+      ...makeSession(),
+      currentStep: 2,
+      entries: [
+        { id: "a", kind: "observation" as const, createdAt: "x", stepNumber: 2, sourceUtterance: "", callId: "c", status: "voided" as const, payload: { text: "VOIDED-OBSERVATION" } },
+        { id: "b", kind: "observation" as const, createdAt: "x", stepNumber: 2, sourceUtterance: "", callId: "d", status: "confirmed" as const, payload: { text: "Tube 4 looks cloudy." } },
+      ],
+      timers: [{ id: "t", label: "spin", durationSeconds: 600, startedAt: "2026-09-26T10:00:00.000Z", endsAt: "2026-09-26T10:10:00.000Z", status: "running" as const, announced: false }],
+    };
+    const p = renderSystemPrompt(s, new Date("2026-09-26T10:05:00.000Z"));
+    expect(p).toContain("Recent log (newest last): step 2 observation: Tube 4 looks cloudy.");
+    expect(p).not.toContain("VOIDED-OBSERVATION");
+    expect(p).toContain("Running timers: 'spin' with 5 minutes left");
+  });
+
   it("says 'not specified' / 'not started' when appropriate", () => {
     const p = renderSystemPrompt({ ...makeSession(), samples: [] });
     expect(p).toContain("Samples in this run: not specified");
     expect(p).toContain("Current step as of this update: not started");
+    expect(p).toContain("Recent log (newest last): nothing logged yet");
+    expect(p).toContain("Running timers: none");
   });
 });
 

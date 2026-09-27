@@ -31,6 +31,8 @@ Legend: ✅ verified (docs + probe) · 📄 docs only · ⚠️ contradicts the 
 | C14 | One tool call per request | ⚠️ The model sometimes repeats an identical call 2–6 times in one turn. | Ledger same-turn guard: an identical state-changing call within one user turn replays the first result. A repeat in a new turn is applied (a repeated reading may be real). |
 | C15 | TTS reads numbers naturally | ⚠️ "245" was sometimes read "2 4 5" and "13,000" digit by digit. Pauses inside one sentence can split it into two user turns. | `say` fields write integers ≥ 100 as words and ratios as "two sixty over two eighty". Split turns are fine now that each reading is its own call. |
 
+| C16 | `max_session_duration_seconds` caps the session (default 10800 = 3 h); `expires_at` reflects it | ⚠️ **Phase 6:** `session.ready.expires_at` is always ≈ **1 hour** after ready (3594 s), whatever cap the token requests (probed with 60, 120, 600, 10800). A 60-second cap was **not enforced**: the session was still open at 95 s. | Rollover is timed from `expires_at` (at 55 min, 5 min before the hour). The token still requests 10800. For testing, localStorage `benchmate:debug-rollover-after-ms` triggers the rollover early (client-side, since the server ignores the cap). |
+
 ## 2. Verified facts
 
 ### Auth / tokens

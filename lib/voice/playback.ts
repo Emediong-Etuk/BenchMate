@@ -41,7 +41,18 @@ export class Playback {
       this.volumeGain.connect(ctx.destination);
       this.applyVolume();
     }
-    if (this.ctx.state === "suspended") await this.ctx.resume();
+    // Without a user gesture (e.g. right after a reload) resume() only settles
+    // after the next tap, so don't wait for it here; see `suspended`.
+    if (this.ctx.state === "suspended") void this.ctx.resume().catch(() => undefined);
+  }
+
+  /** The browser is holding audio output until a user gesture. */
+  get suspended(): boolean {
+    return this.ctx?.state === "suspended";
+  }
+
+  async resume(): Promise<void> {
+    if (this.ctx?.state === "suspended") await this.ctx.resume().catch(() => undefined);
   }
 
   get isPlaying(): boolean {

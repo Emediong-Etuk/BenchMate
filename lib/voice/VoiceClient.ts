@@ -8,17 +8,26 @@ import {
 } from "./events";
 import { base64ToInt16, int16ToBase64 } from "./pcm";
 import { Playback } from "./playback";
+import { MAX_RECONNECT_ATTEMPTS, MAX_RETRYABLE_ATTEMPTS, RESUME_FAILURE_CODES, backoffMs, chooseMode, type ReconnectMode } from "./reconnect";
 import { initialQueueState, reduceQueue, type PendingResult, type QueueInput, type QueueState } from "./toolResultQueue";
 import type { ConnectionState } from "./agentStatus";
 
 // WebSocket state machine for one bench session (brief §8). Owns the socket,
 // mic capture and playback. UI state lives elsewhere; this class reports
 // through `handlers`.
+//
+// Lifecycle (brief §8.7): the socket can drop and be replaced while audio
+// capture and playback keep running, so reconnects need no user gesture.
+// Every attempt fetches a fresh single-use token; one session.resume is tried
+// inside the 30 s grace window, otherwise a fresh session starts with the
+// reconnect config (greeting + state summary in the system prompt).
 
 const WS_URL = "wss://agents.assemblyai.com/v1/ws";
 const READY_TIMEOUT_MS = 12_000;
 const END_TIMEOUT_MS = 3_000;
 const UNDUCK_AFTER_SPEECH_MS = 600;
+
+const SURVIVABLE_ERRORS = new Set(["invalid_format", "invalid_audio", "invalid_value", "immutable_field", "invalid_config", "audio_rate_violation"]);
 
 export type LogEntry = {
   at: number; // Date.now()
@@ -41,16 +50,19 @@ export type VoiceClientHandlers = {
   onPendingToolResults?(count: number): void;
   /** Run a client-side tool. Throwing becomes an is_error result. */
   onToolCall?(call: { callId: string; name: string; args: Record<string, unknown> }): Promise<ToolOutcome> | ToolOutcome;
-  /** A result was actually sent (Phase 3: entry → confirmed). */
+  /** A result was actually sent (entry → confirmed). */
   onToolResultSent?(callId: string): void;
-  /** Results dropped because the reply was interrupted (Phase 3: → unconfirmed). */
+  /** Results dropped because the reply was interrupted or the socket died (→ unconfirmed). */
   onToolResultsDropped?(callIds: string[]): void;
 };
 
 export type ConnectOptions = {
-  buildConfig: () => SessionConfig;
+  /** Built fresh for every connection attempt; isReconnect picks the reconnect greeting. */
+  buildConfig: (ctx: { isReconnect: boolean }) => SessionConfig;
   deviceId?: string;
   autoGainControl?: boolean;
+  /** The first connection of this page already continues an earlier session (e.g. after a reload). */
+  isReconnect?: boolean;
 };
 
 export class VoiceClient {
@@ -60,9 +72,11 @@ export class VoiceClient {
   private state: ConnectionState = "idle";
   private sessionId: string | null = null;
   private expiresAt: number | null = null;
+  private readyAt: number | null = null;
   private muted = false;
   private readyTimer: ReturnType<typeof setTimeout> | null = null;
   private unduckTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private queue: QueueState = initialQueueState;
   private currentReplyId: string | null = null;
   private replyAudioStarted = false;
@@ -70,10 +84,26 @@ export class VoiceClient {
   private sessionEnded = false;
   private endResolver: (() => void) | null = null;
   private opts: ConnectOptions | null = null;
+  // Reconnect bookkeeping
+  private socketGen = 0;
+  private attemptMode: ReconnectMode | null = null;
+  private droppedAt = 0;
+  private resumeFailed = false;
+  private attempts = 0;
+  private retryableAttempts = 0;
+  private rollingOver = false;
   private readonly unsubscribePlayback: () => void;
+  private readonly onOnline = () => {
+    if (this.state === "reconnecting" && this.reconnectTimer) {
+      this.log("local", "network.online", "retrying now");
+      this.clearReconnectTimer();
+      void this.attempt();
+    }
+  };
 
   constructor(private readonly handlers: VoiceClientHandlers) {
     this.unsubscribePlayback = this.playback.onPlayingChange((p) => handlers.onPlayingChange(p));
+    if (typeof window !== "undefined") window.addEventListener("online", this.onOnline);
   }
 
   get connection(): ConnectionState {
@@ -82,8 +112,13 @@ export class VoiceClient {
   get currentSessionId(): string | null {
     return this.sessionId;
   }
+  /** Epoch seconds when the current session hits its maximum duration. */
   get sessionExpiresAt(): number | null {
     return this.expiresAt;
+  }
+  /** Date.now() at the current session's session.ready. */
+  get sessionReadyAt(): number | null {
+    return this.readyAt;
   }
   get isMuted(): boolean {
     return this.muted;
@@ -91,61 +126,52 @@ export class VoiceClient {
   get captureSampleRate(): number | null {
     return this.capture.contextSampleRate;
   }
+  /** True when the browser is holding audio until a user gesture (e.g. after a reload). */
+  get audioSuspended(): boolean {
+    return this.playback.suspended || this.capture.suspended;
+  }
 
-  /** Call from a user gesture: audio contexts need one. */
+  /** Resume audio contexts; call from a user gesture. */
+  async resumeAudio(): Promise<void> {
+    await Promise.all([this.playback.resume(), this.capture.resume()]);
+  }
+
+  /** Start listening. Prefer calling from a user gesture: audio contexts need one. */
   async connect(opts: ConnectOptions): Promise<void> {
-    if (this.state === "connecting" || this.state === "ready") return;
+    if (this.state === "connecting" || this.state === "ready" || this.state === "reconnecting") return;
     this.opts = opts;
-    this.setState("connecting");
     this.sessionEnded = false;
-    this.queue = initialQueueState;
+    this.resumeFailed = true; // nothing to resume on a manual (re)start
+    this.attempts = 0;
+    this.retryableAttempts = 0;
+    this.setState("connecting");
 
     try {
-      await this.playback.init();
-      await this.capture.start({
-        deviceId: opts.deviceId,
-        autoGainControl: opts.autoGainControl,
-        onChunk: (s) => this.sendAudio(s),
-        onLevel: (l) => this.handlers.onMicLevel?.(l),
-      });
-      this.log("local", "mic.started", `capture context ${this.capture.contextSampleRate} Hz`);
+      await this.ensureAudio(opts);
     } catch (err) {
-      const msg = err instanceof CaptureError ? err.message : "Couldn't start audio.";
-      this.fail(msg);
+      this.fail(err instanceof CaptureError ? err.message : "Couldn't start audio.");
       return;
     }
+    if (this.connection !== "connecting") return; // end() called meanwhile
+    await this.openSocket("fresh", Boolean(opts.isReconnect));
+  }
 
-    let token: string;
-    try {
-      token = await fetchToken();
-    } catch (err) {
-      await this.capture.stop();
-      this.fail(err instanceof Error ? err.message : "Couldn't get a voice token.");
-      return;
-    }
-    if (this.connection !== "connecting") {
-      // end() was called while we were fetching the token.
-      await this.capture.stop();
-      return;
-    }
-
-    const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
-    this.ws = ws;
-    this.readyTimer = setTimeout(() => {
-      if (this.state === "connecting") {
-        this.log("local", "ready.timeout", `no session.ready within ${READY_TIMEOUT_MS / 1000} s`);
+  /**
+   * Planned switch to a new session before the server's time cap (brief §8.7).
+   * session.end → session.ended → fresh session with the reconnect config.
+   */
+  rollover(): void {
+    if (this.state !== "ready") return;
+    this.rollingOver = true;
+    this.log("local", "rollover", "switching to a new session before the time limit");
+    this.send({ type: "session.end" });
+    // If session.ended never arrives, switch anyway.
+    setTimeout(() => {
+      if (this.rollingOver && this.state === "ready") {
         this.teardownSocket();
-        void this.capture.stop();
-        this.fail("The voice service didn't respond in time.");
+        this.beginReconnect("fresh-now");
       }
-    }, READY_TIMEOUT_MS);
-
-    ws.onopen = () => this.send({ type: "session.update", session: opts.buildConfig() });
-    ws.onmessage = (e) => {
-      if (typeof e.data === "string") this.onFrame(e.data);
-    };
-    ws.onclose = (e) => this.onClose(ws, e);
-    ws.onerror = () => this.log("local", "ws.error");
+    }, END_TIMEOUT_MS);
   }
 
   setMuted(muted: boolean): void {
@@ -181,8 +207,11 @@ export class VoiceClient {
    */
   async end(opts: { drain?: boolean } = {}): Promise<void> {
     if (opts.drain) await this.waitForPlaybackIdle(12_000);
+    this.clearReconnectTimer();
     const ws = this.ws;
-    if (ws && ws.readyState === WebSocket.OPEN && !this.sessionEnded) {
+    const wasOpen = ws && ws.readyState === WebSocket.OPEN && !this.sessionEnded;
+    this.setState("ended"); // from here on, closes are expected
+    if (wasOpen) {
       const ended = new Promise<void>((resolve) => {
         this.endResolver = resolve;
         setTimeout(resolve, END_TIMEOUT_MS);
@@ -192,9 +221,9 @@ export class VoiceClient {
       this.endResolver = null;
     }
     this.teardownSocket();
+    this.dropPendingResults();
     await this.capture.stop();
     this.playback.flush();
-    this.setState("ended");
   }
 
   private waitForPlaybackIdle(maxMs: number): Promise<void> {
@@ -222,8 +251,109 @@ export class VoiceClient {
 
   async dispose(): Promise<void> {
     await this.end();
+    if (typeof window !== "undefined") window.removeEventListener("online", this.onOnline);
     this.unsubscribePlayback();
     await this.playback.close();
+  }
+
+  // ------------------------------------------------------------- connection
+
+  private async ensureAudio(opts: ConnectOptions): Promise<void> {
+    await this.playback.init();
+    if (this.capture.active) return;
+    await this.capture.start({
+      deviceId: opts.deviceId,
+      autoGainControl: opts.autoGainControl,
+      onChunk: (s) => this.sendAudio(s),
+      onLevel: (l) => this.handlers.onMicLevel?.(l),
+    });
+    this.log("local", "mic.started", `capture context ${this.capture.contextSampleRate} Hz${this.audioSuspended ? " (suspended until a tap)" : ""}`);
+  }
+
+  /** One connection attempt: fresh token → socket → session.resume or session.update. */
+  private async openSocket(mode: ReconnectMode, isReconnect: boolean): Promise<void> {
+    const gen = ++this.socketGen;
+    this.attemptMode = mode;
+    this.sessionEnded = false;
+    let token: string;
+    try {
+      token = await fetchToken();
+    } catch (err) {
+      if (gen !== this.socketGen) return;
+      this.attemptFailed(err instanceof Error ? err.message : "Couldn't get a voice token.");
+      return;
+    }
+    if (gen !== this.socketGen || (this.state !== "connecting" && this.state !== "reconnecting")) return;
+
+    const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
+    this.ws = ws;
+    this.readyTimer = setTimeout(() => {
+      if (this.ws !== ws || this.state === "ready") return;
+      this.log("local", "ready.timeout", `no session.ready within ${READY_TIMEOUT_MS / 1000} s`);
+      this.teardownSocket();
+      this.attemptFailed("The voice service didn't respond in time.");
+    }, READY_TIMEOUT_MS);
+
+    ws.onopen = () => {
+      if (mode === "resume" && this.sessionId) {
+        this.log("local", "reconnect", `trying session.resume ${this.sessionId}`);
+        this.send({ type: "session.resume", session_id: this.sessionId });
+      } else {
+        this.send({ type: "session.update", session: this.opts!.buildConfig({ isReconnect }) });
+      }
+    };
+    ws.onmessage = (e) => {
+      if (this.ws === ws && typeof e.data === "string") this.onFrame(e.data);
+    };
+    ws.onclose = (e) => this.onClose(ws, e);
+    ws.onerror = () => this.log("local", "ws.error");
+  }
+
+  /** Unexpected drop (or planned rollover / server-side end): start the reconnect loop. */
+  private beginReconnect(kind: "drop" | "fresh-now"): void {
+    this.dropPendingResults();
+    this.playback.flush();
+    this.droppedAt = Date.now();
+    this.resumeFailed = kind === "fresh-now";
+    this.rollingOver = false;
+    this.attempts = 0;
+    this.setState("reconnecting", kind === "drop" ? "Connection lost. Reconnecting…" : "Refreshing the connection…");
+    void this.attempt();
+  }
+
+  private async attempt(): Promise<void> {
+    this.clearReconnectTimer();
+    if (this.state !== "reconnecting") return;
+    const mode = chooseMode({ sessionId: this.sessionId, droppedAt: this.droppedAt, now: Date.now(), resumeFailed: this.resumeFailed });
+    this.log("local", "reconnect.attempt", `#${this.attempts + 1} (${mode})`);
+    await this.openSocket(mode, true);
+  }
+
+  /** A connection attempt failed before session.ready. */
+  private attemptFailed(message: string, opts: { retryable?: boolean } = {}): void {
+    this.clearReadyTimer();
+    if (this.state === "connecting") {
+      // First connection of this run: retryable service errors back off (1/2/4/8 s), others need a manual retry.
+      if (opts.retryable && this.retryableAttempts < MAX_RETRYABLE_ATTEMPTS) {
+        const delay = backoffMs(this.retryableAttempts++);
+        this.log("local", "retry", `${message} Retrying in ${delay / 1000} s.`);
+        this.reconnectTimer = setTimeout(() => void this.openSocket("fresh", Boolean(this.opts?.isReconnect)), delay);
+        return;
+      }
+      void this.capture.stop();
+      this.fail(message, opts.retryable);
+      return;
+    }
+    if (this.state !== "reconnecting") return;
+    this.attempts++;
+    if (this.attempts >= MAX_RECONNECT_ATTEMPTS) {
+      void this.capture.stop();
+      this.fail("Couldn't reconnect to the voice service. Your log is saved; tap Reconnect to try again.");
+      return;
+    }
+    const delay = backoffMs(this.attempts - 1);
+    this.log("local", "reconnect.wait", `${message} Next try in ${delay / 1000} s.`);
+    this.reconnectTimer = setTimeout(() => void this.attempt(), delay);
   }
 
   // ---------------------------------------------------------------- internals
@@ -240,9 +370,14 @@ export class VoiceClient {
     switch (ev.type) {
       case "session.ready":
         this.clearReadyTimer();
+        this.clearReconnectTimer();
         this.sessionId = ev.session_id;
         this.expiresAt = ev.expires_at ?? null;
+        this.readyAt = Date.now();
         this.queue = initialQueueState;
+        this.attempts = 0;
+        this.retryableAttempts = 0;
+        this.resumeFailed = false;
         this.setState("ready");
         break;
       case "session.ended":
@@ -298,12 +433,18 @@ export class VoiceClient {
   }
 
   private async runTool(callId: string, name: string, args: Record<string, unknown>): Promise<void> {
+    const gen = this.socketGen;
     let outcome: ToolOutcome;
     try {
       if (!this.handlers.onToolCall) throw new Error(`Tool '${name}' is not available in this build.`);
       outcome = await this.handlers.onToolCall({ callId, name, args });
     } catch (err) {
       outcome = { result: { error: err instanceof Error ? err.message : String(err) }, isError: true };
+    }
+    if (gen !== this.socketGen) {
+      // The socket this call came from is gone; its result can never be sent.
+      this.handlers.onToolResultsDropped?.([callId]);
+      return;
     }
     let result: string;
     try {
@@ -326,27 +467,43 @@ export class VoiceClient {
     this.handlers.onPendingToolResults?.(this.queue.pending.length);
   }
 
+  /** Socket gone: queued results can't be sent any more (entries → unconfirmed). */
+  private dropPendingResults(): void {
+    this.applyQueue({ type: "reset" });
+  }
+
   private sendToolResult(r: PendingResult): void {
     this.send({ type: "tool.result", call_id: r.callId, result: r.result, ...(r.isError ? { is_error: true } : {}) });
     this.handlers.onToolResultSent?.(r.callId);
   }
 
   private onSessionError(code: string, message: string): void {
-    const retryable = RETRYABLE_ERROR_CODES.has(code);
     // Client-message errors leave the session alive (events reference).
-    const survivable = [
-      "invalid_format",
-      "invalid_audio",
-      "invalid_value",
-      "immutable_field",
-      "invalid_config",
-      "audio_rate_violation",
-    ].includes(code);
-    if (survivable) return;
+    if (SURVIVABLE_ERRORS.has(code)) return;
+    const retryable = RETRYABLE_ERROR_CODES.has(code);
+
+    if (this.attemptMode === "resume" && RESUME_FAILURE_CODES.has(code) && this.state === "reconnecting") {
+      // Expected (NOTES C5): fall straight through to a fresh session.
+      this.log("local", "reconnect", `resume failed (${code}); starting a fresh session`);
+      this.resumeFailed = true;
+      this.teardownSocket();
+      void this.attempt();
+      return;
+    }
     this.teardownSocket();
-    void this.capture.stop();
-    this.playback.flush();
-    this.fail(friendlyError(code, message), retryable);
+    if (this.state === "ready") {
+      if (retryable) {
+        this.beginReconnect("drop");
+        return;
+      }
+      void this.capture.stop();
+      this.playback.flush();
+      this.dropPendingResults();
+      this.fail(friendlyError(code, message));
+      return;
+    }
+    // Before session.ready (connecting or reconnecting).
+    this.attemptFailed(friendlyError(code, message), { retryable: retryable || this.state === "reconnecting" });
   }
 
   private onClose(ws: WebSocket, e: CloseEvent): void {
@@ -354,23 +511,25 @@ export class VoiceClient {
     this.log("local", "ws.close", `code ${e.code}${e.reason ? ` · ${e.reason}` : ""}`);
     this.clearReadyTimer();
     this.ws = null;
-    if (this.state === "ended" || this.state === "error") return;
-    void this.capture.stop();
-    this.playback.flush();
-    if (this.sessionEnded) {
-      this.setState("ended");
-      return;
-    }
-    // Phase 6 adds reconnect/resume here. For now, surface it.
-    if (this.state === "connecting") {
-      this.fail(
-        e.code === 1006
-          ? "Couldn't open the voice connection (network or expired token)."
-          : `The voice service closed the connection (code ${e.code}).`,
-        true,
-      );
-    } else {
-      this.setState("offline", "Connection lost.");
+    switch (this.state) {
+      case "ended":
+      case "error":
+      case "idle":
+        return;
+      case "ready":
+        // Clean server end (rollover, time cap) or a network drop: either way keep going.
+        this.beginReconnect(this.sessionEnded || this.rollingOver ? "fresh-now" : "drop");
+        return;
+      case "connecting":
+        this.attemptFailed(
+          e.code === 1006 ? "Couldn't open the voice connection (network or expired token)." : `The voice service closed the connection (code ${e.code}).`,
+          { retryable: true },
+        );
+        return;
+      case "reconnecting":
+      case "offline":
+        this.attemptFailed(`Connection attempt closed (code ${e.code}).`);
+        return;
     }
   }
 
@@ -433,6 +592,11 @@ export class VoiceClient {
   private clearReadyTimer(): void {
     if (this.readyTimer) clearTimeout(this.readyTimer);
     this.readyTimer = null;
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
   }
 
   private clearUnduckTimer(): void {

@@ -30,6 +30,19 @@ export function BenchClient() {
 
   const live = connection === "ready";
   const connecting = connection === "connecting";
+  const reconnecting = connection === "reconnecting";
+
+  // Reload mid-session (brief §8.7, §14): restore and reconnect automatically
+  // with the reconnect greeting. If the browser holds audio until a tap, the
+  // overlay below asks for one.
+  const autoTried = useRef(false);
+  const hasHistory = Boolean(session && session.assemblyaiSessionIds.length > 0);
+  const { connect } = ctl;
+  useEffect(() => {
+    if (!hydrated || !hasHistory || autoTried.current || connection !== "idle") return;
+    autoTried.current = true;
+    void connect();
+  }, [hydrated, hasHistory, connection, connect]);
 
   // Keyboard fallbacks (brief §12): Space mute, ←/→ steps, T type, D debug.
   const ctlRef = useRef(ctl);
@@ -122,7 +135,27 @@ export function BenchClient() {
         </div>
       )}
 
-      {!live && (
+      {ctl.audioBlocked && (
+        <button
+          type="button"
+          onClick={ctl.resumeAudio}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/70 px-6 text-center text-white"
+        >
+          <span className="text-4xl font-bold">Tap anywhere to resume audio</span>
+          <span className="text-lg">The browser paused the microphone and speaker after the page reloaded. Your log is intact.</span>
+        </button>
+      )}
+
+      {reconnecting && (
+        <div role="status" className="flex items-center gap-3 rounded-2xl border-2 border-warn bg-warn/10 px-6 py-4 text-lg">
+          <span className="h-5 w-5 animate-spin rounded-full border-4 border-warn border-t-transparent" aria-hidden />
+          <span>
+            {connectionMessage ?? "Reconnecting…"} Keep working: anything you logged is saved, and BenchMate will pick up where you left off.
+          </span>
+        </div>
+      )}
+
+      {!live && !reconnecting && (
         <section className="flex flex-wrap items-center gap-4 rounded-3xl border-2 border-accent bg-surface p-6">
           <button
             type="button"
@@ -130,7 +163,7 @@ export function BenchClient() {
             disabled={connecting}
             className="min-h-20 min-w-64 rounded-3xl bg-accent px-8 text-2xl font-semibold text-white disabled:opacity-60 dark:text-black"
           >
-            {connecting ? "Connecting…" : connection === "idle" ? "Start listening" : "Reconnect"}
+            {connecting ? "Connecting…" : connection === "idle" && !hasHistory ? "Start listening" : "Reconnect"}
           </button>
           <div className="min-w-0 flex-1">
             {connection === "error" || connection === "offline" ? (

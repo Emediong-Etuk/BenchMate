@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildSessionConfig } from "@/lib/agent/buildSessionConfig";
 import { applyCall, emptyLedger, markDropped, markSent, newTurn, type LedgerState } from "@/lib/agent/ledger";
@@ -12,6 +12,7 @@ import type { BenchSession, SessionTranscriptLine } from "@/lib/store/types";
 import { useVoiceStore } from "@/lib/store/voiceStore";
 import type { ServerEvent } from "@/lib/voice/events";
 import { decide, initialProactive, reduceProactive, type ProactiveEvent, type ProactiveState } from "@/lib/voice/proactiveSpeech";
+import { rolloverAt } from "@/lib/voice/reconnect";
 import { useVoiceClient } from "@/lib/voice/useVoiceClient";
 import { FINISH_REPLY_TIMEOUT_MS, reduceFinish, type FinishEvent, type FinishState } from "./finishFlow";
 
@@ -22,6 +23,25 @@ import { FINISH_REPLY_TIMEOUT_MS, reduceFinish, type FinishEvent, type FinishSta
 // screen wake lock.
 
 const TIMER_TICK_MS = 250;
+/** Event handlers read the clock through this (they run on events, not during render). */
+const clock = () => Date.now();
+const ROLLOVER_ID = "__rollover";
+const ROLLOVER_ANNOUNCE_TIMEOUT_MS = 10_000;
+
+/**
+ * Test hook: localStorage "benchmate:debug-rollover-after-ms" makes the
+ * rollover happen that long after session.ready. The server ignores
+ * max_session_duration_seconds (NOTES C16), so there's no server-side way to
+ * shorten a session for testing.
+ */
+function debugRolloverAfterMs(): number | null {
+  try {
+    const v = Number(localStorage.getItem("benchmate:debug-rollover-after-ms"));
+    return Number.isFinite(v) && v >= 10_000 ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 function active(): BenchSession | undefined {
   const s = useBenchStore.getState();
@@ -45,12 +65,17 @@ export function useBenchController() {
   const finishingRef = useRef(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const proactiveRef = useRef<ProactiveState>(initialProactive);
+  // Rollover near the session time cap (brief §8.7): announce at an idle moment, then switch.
+  const rolloverRef = useRef<{ phase: "idle" | "announcing" | "speaking" | "switching"; since: number }>({ phase: "idle", since: 0 });
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
   /** Feed an event to the proactive-speech gate; a reply.started may confirm an announcement. */
   const stepProactive = (ev: ProactiveEvent) => {
     const out = reduceProactive(proactiveRef.current, ev);
     proactiveRef.current = out.state;
-    if (out.announced) {
+    if (out.announced === ROLLOVER_ID) {
+      rolloverRef.current = { phase: "speaking", since: clock() };
+    } else if (out.announced) {
       const id = out.announced;
       updateActive((s) => markAnnounced(s, id));
     }
@@ -101,6 +126,7 @@ export function useBenchController() {
       switch (ev.type) {
         case "session.ready":
           stepProactive({ type: "session.ready" });
+          rolloverRef.current = { phase: "idle", since: 0 };
           updateActive((s) =>
             s.assemblyaiSessionIds.includes(ev.session_id) ? s : { ...s, assemblyaiSessionIds: [...s.assemblyaiSessionIds, ev.session_id] },
           );
@@ -120,12 +146,16 @@ export function useBenchController() {
         case "reply.done":
           stepProactive({ type: "reply.done" });
           stepFinish("reply.done");
+          if (rolloverRef.current.phase === "speaking") {
+            rolloverRef.current = { phase: "switching", since: clock() };
+            clientRef.current?.rollover();
+          }
           break;
         case "input.speech.started":
           stepProactive({ type: "input.speech.started" });
           break;
         case "input.speech.stopped":
-          stepProactive({ type: "input.speech.stopped", now: Date.now() });
+          stepProactive({ type: "input.speech.stopped", now: clock() });
           break;
         default:
           break;
@@ -219,6 +249,35 @@ export function useBenchController() {
       const client = clientRef.current;
       if (!client || client.connection !== "ready") return;
       const current = fired.session;
+
+      // Rollover takes priority over timer announcements.
+      const ro = rolloverRef.current;
+      const readyAt = client.sessionReadyAt;
+      const expiresAt = client.sessionExpiresAt;
+      if (ro.phase === "announcing" && now.getTime() - ro.since > ROLLOVER_ANNOUNCE_TIMEOUT_MS) {
+        rolloverRef.current = { phase: "switching", since: now.getTime() };
+        client.rollover();
+        return;
+      }
+      if (ro.phase !== "idle") return;
+      const debugAfter = readyAt ? debugRolloverAfterMs() : null;
+      const due = readyAt && (debugAfter !== null ? readyAt + debugAfter : expiresAt ? rolloverAt(readyAt, expiresAt) : null);
+      if (due && now.getTime() >= due) {
+        const gate = decide(proactiveRef.current, {
+          now: now.getTime(),
+          pending: [ROLLOVER_ID],
+          pendingToolResults: useVoiceStore.getState().pendingToolResults,
+          hold: finishingRef.current || finishRef.current !== "idle",
+        });
+        proactiveRef.current = gate.state;
+        if (gate.send) {
+          client.replyNow('Say exactly this and nothing else: "Refreshing the connection, one moment."');
+          stepProactive({ type: "sent", timerId: ROLLOVER_ID, now: now.getTime() });
+          rolloverRef.current = { phase: "announcing", since: now.getTime() };
+        }
+        return;
+      }
+
       const pending = pendingAnnouncements(current);
       const out = decide(proactiveRef.current, {
         now: now.getTime(),
@@ -236,6 +295,18 @@ export function useBenchController() {
     return () => clearInterval(id);
   }, [clientRef]);
 
+  // After a reload the browser may hold audio until a tap (autoplay policy).
+  useEffect(() => {
+    const id = setInterval(() => {
+      const c = clientRef.current;
+      const live = c && (c.connection === "ready" || c.connection === "connecting" || c.connection === "reconnecting");
+      setAudioBlocked(Boolean(live && c.audioSuspended));
+    }, 500);
+    return () => clearInterval(id);
+  }, [clientRef]);
+
+  const resumeAudio = useCallback(() => void clientRef.current?.resumeAudio(), [clientRef]);
+
   const dismissTimer = useCallback((timerId: string) => updateActive((s) => dismissFinished(s, timerId)), []);
 
   const connect = useCallback(async () => {
@@ -248,7 +319,9 @@ export function useBenchController() {
     // A session that already has conversation behind it gets the reconnect greeting.
     const isReconnect = session.assemblyaiSessionIds.length > 0;
     await client.connect({
-      buildConfig: () => buildSessionConfig(active() ?? session, { settings: useBenchStore.getState().settings, isReconnect }),
+      isReconnect,
+      // Rebuilt for every attempt so a reconnect carries the latest state summary.
+      buildConfig: (ctx) => buildSessionConfig(active() ?? session, { settings: useBenchStore.getState().settings, isReconnect: ctx.isReconnect }),
       autoGainControl: settings.autoGainControl,
     });
   }, [clientRef]);
@@ -301,5 +374,5 @@ export function useBenchController() {
 
   const endByButton = useCallback(() => finishApiRef.current?.finish({ drain: false }), []);
 
-  return { clientRef, connect, sendText, setMuted, setVolume, navigateByKey, endByButton, dismissTimer };
+  return { clientRef, connect, sendText, setMuted, setVolume, navigateByKey, endByButton, dismissTimer, audioBlocked, resumeAudio };
 }

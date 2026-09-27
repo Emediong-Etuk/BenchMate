@@ -11,7 +11,8 @@ const TOKEN_URL = "https://agents.assemblyai.com/v1/token";
 const EXPIRES_IN_SECONDS = 120;
 const MAX_SESSION_DURATION_SECONDS = 10_800;
 
-const limiter = createRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 });
+// Reconnect attempts each need a fresh token, so leave headroom for a flaky network.
+const limiter = createRateLimiter({ limit: 30, windowMs: 10 * 60 * 1000 });
 
 function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store", ...extra } });

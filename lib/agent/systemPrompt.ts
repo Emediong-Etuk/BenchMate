@@ -1,5 +1,6 @@
 import type { BenchSession } from "@/lib/store/types";
-import { formatSampleList } from "./format";
+import { formatDurationSpoken, formatSampleList } from "./format";
+import { secondsRemaining, summarizeEntry } from "./toolHandlers";
 
 // System prompt (brief §9.2), kept verbatim except for approved additions
 // (PLAN Q3): the docs' default-to-call line, a few-shot block, and the
@@ -59,12 +60,30 @@ CONTEXT
 Protocol: {{PROTOCOL_TITLE}} ({{TOTAL_STEPS}} steps)
 Samples in this run: {{SAMPLES}}
 Current step as of this update: {{CURRENT_STEP}}
+Recent log (newest last): {{RECENT_LOG}}
+Running timers: {{RUNNING_TIMERS}}
 
 <protocol>
 {{NUMBERED_STEPS}}
 </protocol>`;
 
-export function renderSystemPrompt(session: BenchSession): string {
+/**
+ * State summary for reconnects (brief §8.7). The brief sends it as a system
+ * conversation.message, but that has no effect (NOTES C10), so it lives here.
+ */
+function recentLog(session: BenchSession): string {
+  const live = session.entries.filter((e) => e.status !== "voided").slice(-5);
+  return live.length ? live.map((e) => `step ${e.stepNumber || "-"} ${summarizeEntry(e)}`).join("; ") : "nothing logged yet";
+}
+
+function runningTimers(session: BenchSession, now: Date): string {
+  const running = session.timers.filter((t) => t.status === "running");
+  return running.length
+    ? running.map((t) => `'${t.label}' with ${formatDurationSpoken(secondsRemaining(t, now))} left`).join("; ")
+    : "none";
+}
+
+export function renderSystemPrompt(session: BenchSession, now: Date = new Date()): string {
   const steps = session.protocol.steps;
   const current =
     session.currentStep > 0 && steps[session.currentStep - 1]
@@ -74,5 +93,7 @@ export function renderSystemPrompt(session: BenchSession): string {
     .replace("{{TOTAL_STEPS}}", String(steps.length))
     .replace("{{SAMPLES}}", session.samples.length ? formatSampleList(session.samples) : "not specified")
     .replace("{{CURRENT_STEP}}", current)
+    .replace("{{RECENT_LOG}}", recentLog(session))
+    .replace("{{RUNNING_TIMERS}}", runningTimers(session, now))
     .replace("{{NUMBERED_STEPS}}", steps.map((s) => `${s.number}. ${s.text}`).join("\n"));
 }

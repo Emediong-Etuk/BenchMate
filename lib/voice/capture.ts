@@ -44,6 +44,15 @@ export class Capture {
     return this.ctx !== null;
   }
 
+  /** The browser is holding the capture context until a user gesture. */
+  get suspended(): boolean {
+    return this.ctx?.state === "suspended";
+  }
+
+  async resume(): Promise<void> {
+    if (this.ctx?.state === "suspended") await this.ctx.resume().catch(() => undefined);
+  }
+
   async start(opts: CaptureOptions): Promise<void> {
     await this.stop();
     this.opts = opts;
@@ -79,7 +88,8 @@ export class Capture {
 
   private async wire(ctx: AudioContext): Promise<void> {
     this.ctx = ctx;
-    await ctx.resume();
+    // Don't block on resume(): without a user gesture it settles only after a tap.
+    void ctx.resume().catch(() => undefined);
     await ctx.audioWorklet.addModule("/worklets/pcm-capture.js");
     const source = ctx.createMediaStreamSource(this.stream!);
     // numberOfOutputs: 0 makes the node a sink, so it's processed without
