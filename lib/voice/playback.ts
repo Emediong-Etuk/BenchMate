@@ -137,6 +137,18 @@ export class Playback {
     };
   }
 
+  /** Timer-finished chime: a rising two-note pattern, three times (brief §8.6). */
+  playChime(): void {
+    for (let i = 0; i < 3; i++) {
+      this.playTone(880, 0.22, i * 0.7);
+      this.playTone(1320, 0.35, i * 0.7 + 0.18);
+    }
+  }
+
+  get initialized(): boolean {
+    return this.ctx !== null;
+  }
+
   async close(): Promise<void> {
     this.flush();
     await this.ctx?.close().catch(() => undefined);

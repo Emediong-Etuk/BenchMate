@@ -55,6 +55,8 @@ export type Timer = {
   status: "running" | "done" | "cancelled";
   announced: boolean;
   finishedAt?: string;
+  /** Finished timers flash until the next user utterance or a tap. */
+  dismissed?: boolean;
 };
 
 export type StepEvent = { stepNumber: number; startedAt: string; completedAt?: string };

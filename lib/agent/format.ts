@@ -79,3 +79,17 @@ export function parseDurationInput(input: string): number | null | undefined {
   const v = Math.round(Number(m[1]) * unit);
   return v > 0 ? v : undefined;
 }
+
+/** Spoken duration for announcements: 600 → "10 minutes", 90 → "1 minute 30 seconds". */
+export function formatDurationSpoken(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const parts: string[] = [];
+  if (h) parts.push(unit(h, "hour"));
+  if (m) parts.push(unit(m, "minute"));
+  if (sec || parts.length === 0) parts.push(unit(sec, "second"));
+  return parts.join(" ");
+}

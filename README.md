@@ -2,7 +2,7 @@
 
 Hands-free voice lab assistant built on the AssemblyAI Voice Agent API. See `PLAN.md` for the build plan and `NOTES.md` for verified API behaviour.
 
-> Work in progress: Phases 1–3 complete (voice loop; protocols, Home, Setup; tools and hands-free bench mode).
+> Work in progress: Phases 1–4 complete (voice loop; protocols, Home, Setup; tools and hands-free bench mode; timers with proactive announcements).
 
 ## Setup
 

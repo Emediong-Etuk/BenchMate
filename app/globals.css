@@ -73,8 +73,15 @@ body {
 }
 .pulse-ring { animation: soft-pulse 1.6s ease-in-out infinite; }
 
+@keyframes timer-flash {
+  0%, 100% { background: var(--accent-soft); }
+  50% { background: var(--accent); color: var(--bg); }
+}
+.timer-flash { animation: timer-flash 1s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .pulse-ring { animation: none; }
+  .timer-flash { animation: none; background: var(--accent-soft); }
 }
 
 @media print {

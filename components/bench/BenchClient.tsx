@@ -153,7 +153,7 @@ export function BenchClient() {
           {live && <VoiceLevelMeter />}
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <TimerPanel timers={session.timers} />
+          <TimerPanel timers={session.timers} onDismiss={ctl.dismissTimer} />
           <LogFeed entries={session.entries} />
           {showDebug && <DebugPanel onSendText={ctl.sendText} canSend={live} inputRef={textRef} />}
         </div>

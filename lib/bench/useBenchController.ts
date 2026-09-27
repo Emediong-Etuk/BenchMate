@@ -5,18 +5,23 @@ import { useRouter } from "next/navigation";
 import { buildSessionConfig } from "@/lib/agent/buildSessionConfig";
 import { applyCall, emptyLedger, markDropped, markSent, newTurn, type LedgerState } from "@/lib/agent/ledger";
 import { renderSystemPrompt } from "@/lib/agent/systemPrompt";
+import { announcementInstructions, dismissFinished, fireDueTimers, markAnnounced, pendingAnnouncements } from "@/lib/agent/timers";
 import { runTool } from "@/lib/agent/toolHandlers";
 import { useBenchStore } from "@/lib/store/benchStore";
 import type { BenchSession, SessionTranscriptLine } from "@/lib/store/types";
 import { useVoiceStore } from "@/lib/store/voiceStore";
 import type { ServerEvent } from "@/lib/voice/events";
+import { decide, initialProactive, reduceProactive, type ProactiveEvent, type ProactiveState } from "@/lib/voice/proactiveSpeech";
 import { useVoiceClient } from "@/lib/voice/useVoiceClient";
 import { FINISH_REPLY_TIMEOUT_MS, reduceFinish, type FinishEvent, type FinishState } from "./finishFlow";
 
 // Glue between the voice client and the authoritative bench store:
 // tool calls → ledger (commit semantics) → store; effects (volume, finish);
 // transcript and AssemblyAI session ids into the session; keyboard
-// navigation through the same handlers; screen wake lock.
+// navigation through the same handlers; timers + proactive announcements;
+// screen wake lock.
+
+const TIMER_TICK_MS = 250;
 
 function active(): BenchSession | undefined {
   const s = useBenchStore.getState();
@@ -39,6 +44,17 @@ export function useBenchController() {
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishingRef = useRef(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const proactiveRef = useRef<ProactiveState>(initialProactive);
+
+  /** Feed an event to the proactive-speech gate; a reply.started may confirm an announcement. */
+  const stepProactive = (ev: ProactiveEvent) => {
+    const out = reduceProactive(proactiveRef.current, ev);
+    proactiveRef.current = out.state;
+    if (out.announced) {
+      const id = out.announced;
+      updateActive((s) => markAnnounced(s, id));
+    }
+  };
 
   // Finish logic needs the client, which needs these handlers: the handlers
   // call through this ref, filled in once the client exists.
@@ -84,28 +100,39 @@ export function useBenchController() {
       const at = new Date().toISOString();
       switch (ev.type) {
         case "session.ready":
+          stepProactive({ type: "session.ready" });
           updateActive((s) =>
             s.assemblyaiSessionIds.includes(ev.session_id) ? s : { ...s, assemblyaiSessionIds: [...s.assemblyaiSessionIds, ev.session_id] },
           );
           break;
         case "transcript.user":
           ledgerRef.current = newTurn(ledgerRef.current);
+          updateActive((s) => dismissFinished(s)); // a finished timer flashes until the next utterance
           appendTranscript({ role: "user", text: ev.text, at });
           break;
         case "transcript.agent":
           if (ev.text.trim()) appendTranscript({ role: "agent", text: ev.text, at, ...(ev.interrupted ? { interrupted: true } : {}) });
           break;
         case "reply.started":
+          stepProactive({ type: "reply.started" });
           stepFinish("reply.started");
           break;
         case "reply.done":
+          stepProactive({ type: "reply.done" });
           stepFinish("reply.done");
+          break;
+        case "input.speech.started":
+          stepProactive({ type: "input.speech.started" });
+          break;
+        case "input.speech.stopped":
+          stepProactive({ type: "input.speech.stopped", now: Date.now() });
           break;
         default:
           break;
       }
     },
     onConnection: (state) => {
+      if (state !== "ready") stepProactive({ type: "disconnected" });
       if (state === "ready") void acquireWakeLock();
       if (state === "ended" || state === "error") void releaseWakeLock();
     },
@@ -177,6 +204,40 @@ export function useBenchController() {
     };
   }, []);
 
+  // Timer engine + proactive announcements (brief §8.6). Runs whether or not
+  // the voice is connected: timers still fire and chime; announcements wait.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const session = active();
+      if (!session || session.endedAt) return;
+      const now = new Date();
+      const fired = fireDueTimers(session, now);
+      if (fired.fired.length) {
+        useBenchStore.getState().updateSession(session.id, () => fired.session);
+        clientRef.current?.playback.playChime();
+      }
+      const client = clientRef.current;
+      if (!client || client.connection !== "ready") return;
+      const current = fired.session;
+      const pending = pendingAnnouncements(current);
+      const out = decide(proactiveRef.current, {
+        now: now.getTime(),
+        pending: pending.map((t) => t.id),
+        pendingToolResults: useVoiceStore.getState().pendingToolResults,
+        hold: finishingRef.current || finishRef.current !== "idle",
+      });
+      proactiveRef.current = out.state;
+      if (out.send) {
+        const timer = pending.find((t) => t.id === out.send)!;
+        client.replyNow(announcementInstructions(current, timer, now));
+        stepProactive({ type: "sent", timerId: timer.id, now: now.getTime() });
+      }
+    }, TIMER_TICK_MS);
+    return () => clearInterval(id);
+  }, [clientRef]);
+
+  const dismissTimer = useCallback((timerId: string) => updateActive((s) => dismissFinished(s, timerId)), []);
+
   const connect = useCallback(async () => {
     const client = clientRef.current;
     const session = active();
@@ -197,6 +258,7 @@ export function useBenchController() {
       const t = text.trim();
       if (!t) return;
       ledgerRef.current = newTurn(ledgerRef.current);
+      updateActive((s) => dismissFinished(s));
       clientRef.current?.sendText(t);
       useVoiceStore.getState().addTypedUtterance(t);
       appendTranscript({ role: "user", text: t, at: new Date().toISOString(), typed: true });
@@ -239,5 +301,5 @@ export function useBenchController() {
 
   const endByButton = useCallback(() => finishApiRef.current?.finish({ drain: false }), []);
 
-  return { clientRef, connect, sendText, setMuted, setVolume, navigateByKey, endByButton };
+  return { clientRef, connect, sendText, setMuted, setVolume, navigateByKey, endByButton, dismissTimer };
 }
