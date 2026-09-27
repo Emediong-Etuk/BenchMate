@@ -84,7 +84,18 @@ body {
   .timer-flash { animation: none; background: var(--accent-soft); }
 }
 
+/* Print: black on white, no UI chrome (brief §12). Applies in dark mode too. */
 @media print {
-  :root { --bg: #fff; --surface: #fff; --text: #000; --muted: #333; --border: #999; }
-  .no-print { display: none !important; }
+  :root, :root * {
+    --bg: #fff; --surface: #fff; --surface-2: #f2f2f2; --text: #000; --muted: #333; --border: #999;
+    --accent: #000; --accent-soft: #fff; --warn: #000; --bad: #000;
+  }
+  html, body { background: #fff !important; color: #000 !important; }
+  .no-print, footer.no-print { display: none !important; }
+  .entry-page { max-width: none; padding: 0; gap: 1.25rem; }
+  .entry-page .transcript { max-height: none !important; overflow: visible !important; }
+  .entry-page table { font-size: 10pt; }
+  .entry-page tr, .entry-page .stat { break-inside: avoid; }
+  .entry-page h2 { break-after: avoid; }
+  @page { margin: 16mm; }
 }
