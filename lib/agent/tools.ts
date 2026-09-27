@@ -145,8 +145,17 @@ export const TOOLS: ToolDefinition[] = [
     ...base,
     name: "void_last_entry",
     description:
-      "Void the most recent logged entry (measurement, deviation, or observation) when the user says scratch that, delete that, undo, or that's wrong. Voided entries are kept for the audit trail but excluded from results.",
-    parameters: { type: "object", properties: {} },
+      "Void the most recent logged entry (measurement, deviation, or observation) when the user says scratch that, delete that, undo, or that's wrong. For a correction of a specific number ('no, 254 not 245'), pass the wrong number as value so exactly that reading is voided. Voided entries are kept for the audit trail but excluded from results.",
+    parameters: {
+      type: "object",
+      properties: {
+        value: {
+          type: "number",
+          description: "Only for correcting a specific reading: the wrong number the user is correcting, e.g. 245 in 'no, 254 not 245'. Omit for scratch that / undo.",
+          examples: [245],
+        },
+      },
+    },
   },
   {
     ...base,

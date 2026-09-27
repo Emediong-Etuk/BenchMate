@@ -44,7 +44,7 @@ export function runTool(name: string, session: BenchSession, args: Args, ctx: To
     case "log_observation":
       return logObservation(session, args, ctx);
     case "void_last_entry":
-      return voidLastEntry(session, ctx);
+      return voidLastEntry(session, args, ctx);
     case "start_timer":
       return startTimer(session, args, ctx);
     case "list_timers":
@@ -302,9 +302,34 @@ function logObservation(s: BenchSession, args: Args, ctx: ToolCtx): ToolOutput {
   };
 }
 
-function voidLastEntry(s: BenchSession, ctx: ToolCtx): ToolOutput {
+function voidLastEntry(s: BenchSession, args: Args, ctx: ToolCtx): ToolOutput {
   const live = s.entries.filter((e) => e.status !== "voided");
   if (live.length === 0) return fail(s, "There are no entries to void yet.");
+
+  // Correction of a specific number: void exactly the most recent live
+  // measurement with that value. Group voiding here would void the wrong
+  // reading when one utterance was split into several turns.
+  if (typeof args.value === "number" && Number.isFinite(args.value)) {
+    const target = [...live]
+      .filter((e) => e.kind === "measurement" && e.payload.value === args.value)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .at(-1);
+    if (!target) {
+      const recent = live
+        .slice(-3)
+        .map(summarizeEntry)
+        .join("; ");
+      return fail(s, `No live reading has the value ${args.value}, so nothing was voided. Recent entries: ${recent}. Ask which one to correct.`);
+    }
+    const at = ctx.now.toISOString();
+    const voidedEntry = { ...target, status: "voided" as const, voidedAt: at };
+    return {
+      nextState: { ...s, entries: s.entries.map((e) => (e.id === target.id ? voidedEntry : e)) },
+      result: { ok: true, voided: [summarizeEntry(voidedEntry)], note: "Only this reading was voided; the others stay logged." },
+      isError: false,
+    };
+  }
+
   // Most recent by creation time; ties resolved by position (later wins).
   let last = live[0]!;
   for (const e of live) if (e.createdAt >= last.createdAt) last = e;

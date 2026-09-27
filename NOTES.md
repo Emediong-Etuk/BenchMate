@@ -33,6 +33,8 @@ Legend: ✅ verified (docs + probe) · 📄 docs only · ⚠️ contradicts the 
 
 | C16 | `max_session_duration_seconds` caps the session (default 10800 = 3 h); `expires_at` reflects it | ⚠️ **Phase 6:** `session.ready.expires_at` is always ≈ **1 hour** after ready (3594 s), whatever cap the token requests (probed with 60, 120, 600, 10800). A 60-second cap was **not enforced**: the session was still open at 95 s. | Rollover is timed from `expires_at` (at 55 min, 5 min before the hour). The token still requests 10800. For testing, localStorage `benchmate:debug-rollover-after-ms` triggers the rollover early (client-side, since the server ignores the cap). |
 
+| C17 | "Scratch that" voids by utterance group; corrections reuse it | ⚠️ **Found testing the live deployment:** a measurement spoken with a pause arrives as **two turns** (two groups). "No, 254 not 245" then voided the most recent group, which was the *ratio*, not 245, so 245 and 254 both stayed live. | `void_last_entry` takes an optional `value`. A correction passes the wrong number and exactly that reading is voided; plain "scratch that" still voids the last utterance. Verified by voice for both the split-turn and single-turn shapes. |
+
 ## 2. Verified facts
 
 ### Auth / tokens
