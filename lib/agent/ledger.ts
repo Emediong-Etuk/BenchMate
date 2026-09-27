@@ -80,7 +80,8 @@ const MUTATING = new Set([
 function isRelative(name: string, args: Record<string, unknown>): boolean {
   if (name === "navigate_protocol") return args.action === "next" || args.action === "previous";
   if (name === "set_volume") return args.change === "up" || args.change === "down";
-  return name === "void_last_entry";
+  // A plain "scratch that" depends on what's newest; a value-targeted void doesn't.
+  return name === "void_last_entry" && typeof args.value !== "number";
 }
 
 function isMutating(name: string, args: Record<string, unknown>): boolean {

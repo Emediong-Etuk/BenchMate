@@ -196,6 +196,25 @@ describe("void_last_entry", () => {
   });
 });
 
+describe("void_last_entry with a value (corrections)", () => {
+  it("voids exactly the corrected reading even when the utterance was split into two turns", () => {
+    let s = makeSession();
+    s = run(s, "record_measurement", { sample_id: "2", quantity: "concentration", value: 245, unit: "ng/ul" }, ctx({ groupId: "u1", now: new Date("2026-09-26T10:01:00Z") })).nextState;
+    s = run(s, "record_measurement", { sample_id: "2", quantity: "260 over 280", value: 1.86 }, ctx({ groupId: "u2", now: new Date("2026-09-26T10:01:05Z") })).nextState;
+    const out = run(s, "void_last_entry", { value: 245 }, ctx({ groupId: "u3" }));
+    expect(out.nextState.entries.map((e) => `${(e.payload as { value: number }).value}:${e.status}`)).toEqual(["245:voided", "1.86:pending"]);
+    expect(out.result.voided).toEqual(["measurement: sample 2 concentration 245 ng/µL"]);
+  });
+
+  it("errors helpfully when no live reading has that value", () => {
+    const s = run(makeSession(), "record_measurement", { quantity: "ph", value: 7.4 }).nextState;
+    const out = run(s, "void_last_entry", { value: 245 });
+    expect(out.isError).toBe(true);
+    expect(out.result.error).toMatch(/No live reading has the value 245/);
+    expect(out.nextState.entries[0]!.status).toBe("pending");
+  });
+});
+
 describe("timers", () => {
   it("starts a timer with a default label and local end time", () => {
     const c = ctx();
