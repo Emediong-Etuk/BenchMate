@@ -6,6 +6,7 @@ import {
   type ServerEvent,
   type SessionConfig,
 } from "./events";
+import { bargeInStep, initialBargeInState, type BargeInState } from "./bargeIn";
 import { base64ToInt16, int16ToBase64 } from "./pcm";
 import { Playback } from "./playback";
 import { MAX_RECONNECT_ATTEMPTS, MAX_RETRYABLE_ATTEMPTS, RESUME_FAILURE_CODES, backoffMs, chooseMode, type ReconnectMode } from "./reconnect";
@@ -81,6 +82,10 @@ export class VoiceClient {
   private currentReplyId: string | null = null;
   private replyAudioStarted = false;
   private droppingAudio = false;
+  /** Client-side barge-in help: mic boost while the agent plays + early local duck (NOTES C18). */
+  private bargeIn: BargeInState = initialBargeInState;
+  /** Between the server's input.speech.started and input.speech.stopped. */
+  private serverSpeech = false;
   private sessionEnded = false;
   private endResolver: (() => void) | null = null;
   private opts: ConnectOptions | null = null;
@@ -388,17 +393,20 @@ export class VoiceClient {
         this.onSessionError(ev.code, ev.message);
         break;
       case "input.speech.started":
+        this.serverSpeech = true;
         this.clearUnduckTimer();
         this.playback.duck();
         this.applyQueue({ type: "input.speech.started" });
         break;
       case "input.speech.stopped":
+        this.serverSpeech = false;
         this.clearUnduckTimer();
         this.unduckTimer = setTimeout(() => this.playback.unduck(), UNDUCK_AFTER_SPEECH_MS);
         break;
       case "reply.started":
         this.clearUnduckTimer();
         this.playback.unduck();
+        this.bargeIn = { ...this.bargeIn, localDuck: false, loudChunks: 0 };
         this.currentReplyId = ev.reply_id;
         this.replyAudioStarted = false;
         this.droppingAudio = false;
@@ -537,8 +545,17 @@ export class VoiceClient {
     if (this.state !== "ready" || this.muted) return;
     const ws = this.ws;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify({ type: "input.audio", audio: int16ToBase64(samples) } satisfies ClientMessage));
-    this.handlers.onLog({ at: Date.now(), dir: "out", type: "input.audio", bytes: samples.byteLength });
+    const step = bargeInStep(this.bargeIn, samples, this.playback.isPlaying, performance.now());
+    this.bargeIn = step.state;
+    if (step.duck === "duck") {
+      this.playback.duck();
+      this.log("local", "barge-in", "user speech over agent audio: ducked");
+    } else if (step.duck === "unduck" && !this.serverSpeech && !this.unduckTimer) {
+      // No interruption followed (e.g. a cough or "uh-huh"); restore the agent's volume.
+      this.playback.unduck();
+    }
+    ws.send(JSON.stringify({ type: "input.audio", audio: int16ToBase64(step.samples) } satisfies ClientMessage));
+    this.handlers.onLog({ at: Date.now(), dir: "out", type: "input.audio", bytes: step.samples.byteLength });
   }
 
   private send(msg: ClientMessage): void {
