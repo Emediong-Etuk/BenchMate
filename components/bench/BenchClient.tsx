@@ -6,6 +6,9 @@ import { useBenchController } from "@/lib/bench/useBenchController";
 import { useBenchStore } from "@/lib/store/benchStore";
 import { useHydratedBenchStore } from "@/lib/store/useHydrated";
 import { useVoiceStore } from "@/lib/store/voiceStore";
+import { buttonClass } from "@/components/ui/button";
+import { Logo } from "@/components/ui/Logo";
+import { SiteHeader } from "@/components/ui/SiteHeader";
 import { CaptionStrip } from "./CaptionStrip";
 import { DebugPanel } from "./DebugPanel";
 import { FirstRunTips } from "./FirstRunTips";
@@ -86,35 +89,42 @@ export function BenchClient() {
   if (!hydrated) return <main className="p-8 text-muted">Loading…</main>;
   if (!session) {
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold">No active bench session</h1>
-        <p className="text-muted">Choose a protocol and press Start on the setup screen.</p>
-        <Link href="/" className="inline-flex min-h-14 w-fit items-center rounded-2xl bg-accent px-6 font-semibold text-white dark:text-black">
-          Choose a protocol
-        </Link>
-      </main>
+      <>
+        <SiteHeader />
+        <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-20">
+          <h1 className="text-2xl font-semibold">No session running</h1>
+          <p className="text-muted">Choose a protocol on the home screen, check the steps, then press Start.</p>
+          <Link href="/" className={buttonClass("primary", "lg", "w-fit")}>
+            Choose a protocol
+          </Link>
+        </main>
+      </>
     );
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6">
-      <header className="flex flex-wrap items-center gap-3">
-        <Link href="/" className="font-semibold text-muted hover:text-accent" title="Home (the session keeps running)">
-          BenchMate
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-4 sm:px-6">
+      <header className="flex flex-wrap items-center gap-3 border-b border-border/70 pb-4">
+        <Link href="/" className="rounded-xl" title="Home (your session keeps its place)" aria-label="BenchMate home">
+          <Logo compact />
         </Link>
-        <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{session.protocol.title}</h1>
-        <ElapsedClock since={session.startedAt} />
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg font-semibold text-text">{session.protocol.title}</h1>
+          <p className="text-sm text-faint">
+            <ElapsedClock since={session.startedAt} />
+          </p>
+        </div>
         <StatusPill />
         <button
           type="button"
           onClick={() => ctl.setMuted(!muted)}
           disabled={!live}
           aria-pressed={muted}
-          className={`min-h-16 min-w-16 rounded-2xl border-2 px-4 font-semibold disabled:opacity-40 ${muted ? "border-bad bg-bad text-white" : "border-border"}`}
+          className={buttonClass("secondary", "md", `min-h-12 ${muted ? "border-warn/60 text-warn" : ""}`)}
         >
           {muted ? "Unmute" : "Mute"}
         </button>
-        <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" className="min-h-16 min-w-16 rounded-2xl border-2 border-border text-2xl">
+        <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings" className={buttonClass("secondary", "md", "min-h-12 w-12 px-0 text-xl")}>
           ⚙
         </button>
         <button
@@ -123,15 +133,15 @@ export function BenchClient() {
             if (confirmEnd) void ctl.endByButton();
             else setConfirmEnd(true);
           }}
-          className={`min-h-16 min-w-24 rounded-2xl px-5 text-lg font-semibold text-white ${confirmEnd ? "bg-bad ring-4 ring-bad/30" : "bg-bad/90"}`}
+          className={buttonClass(confirmEnd ? "danger" : "secondary", "md", "min-h-12")}
         >
-          {confirmEnd ? "Tap to end" : "End"}
+          {confirmEnd ? "Tap again to finish" : "Finish"}
         </button>
       </header>
 
       {muted && live && (
-        <div role="alert" className="rounded-2xl bg-bad px-6 py-4 text-center text-2xl font-bold tracking-wide text-white">
-          MIC MUTED · press Space or Unmute
+        <div role="alert" className="rounded-2xl border border-warn/40 bg-warn/10 px-6 py-3 text-center text-lg font-medium text-warn">
+          Your microphone is muted. Press Space or Unmute when you want BenchMate to hear you.
         </div>
       )}
 
@@ -139,67 +149,64 @@ export function BenchClient() {
         <button
           type="button"
           onClick={ctl.resumeAudio}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/70 px-6 text-center text-white"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-bg/90 px-6 text-center backdrop-blur-sm"
         >
-          <span className="text-4xl font-bold">Tap anywhere to resume audio</span>
-          <span className="text-lg">The browser paused the microphone and speaker after the page reloaded. Your log is intact.</span>
+          <span className="text-3xl font-semibold text-text">Tap anywhere to continue</span>
+          <span className="max-w-md text-lg text-muted">The browser paused sound after the page reloaded. Everything you recorded is still here.</span>
         </button>
       )}
 
       {reconnecting && (
-        <div role="status" className="flex items-center gap-3 rounded-2xl border-2 border-warn bg-warn/10 px-6 py-4 text-lg">
-          <span className="h-5 w-5 animate-spin rounded-full border-4 border-warn border-t-transparent" aria-hidden />
+        <div role="status" className="flex items-center gap-3 rounded-2xl border border-warn/30 bg-warn/[0.07] px-5 py-4 text-lg text-text">
+          <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-warn border-t-transparent" aria-hidden />
           <span>
-            {connectionMessage ?? "Reconnecting…"} Keep working: anything you logged is saved, and BenchMate will pick up where you left off.
+            {connectionMessage ?? "Reconnecting…"} <span className="text-muted">Keep working. Everything is saved and BenchMate will pick up where you left off.</span>
           </span>
         </div>
       )}
 
       {connecting && hasHistory && (
-        <div role="status" className="flex items-center gap-3 rounded-2xl border-2 border-accent bg-accent-soft px-6 py-3 text-lg">
-          <span className="h-5 w-5 animate-spin rounded-full border-4 border-accent border-t-transparent" aria-hidden />
+        <div role="status" className="flex items-center gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-5 py-3 text-lg text-text">
+          <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" aria-hidden />
           Reconnecting to pick up where you left off…
         </div>
       )}
 
       {!live && !reconnecting && !(connecting && hasHistory) && (
-        <section className="flex flex-wrap items-center gap-4 rounded-3xl border-2 border-accent bg-surface p-6">
-          <button
-            type="button"
-            onClick={() => void ctl.connect()}
-            disabled={connecting}
-            className="min-h-20 min-w-64 rounded-3xl bg-accent px-8 text-2xl font-semibold text-white disabled:opacity-60 dark:text-black"
-          >
+        <section className="fade-up flex flex-col gap-5 rounded-3xl border border-accent/30 bg-accent-soft/50 p-6 sm:flex-row sm:items-center sm:gap-6 sm:p-8">
+          <button type="button" onClick={() => void ctl.connect()} disabled={connecting} className={buttonClass("primary", "xl", "w-full shrink-0 rounded-3xl sm:w-auto sm:min-w-64")}>
             {connecting ? "Connecting…" : connection === "idle" && !hasHistory ? "Start listening" : "Reconnect"}
           </button>
           <div className="min-w-0 flex-1">
             {connection === "error" || connection === "offline" ? (
               <p className="text-lg text-bad" role="alert">
-                {connectionMessage ?? "The voice connection stopped."} Your log is saved.
+                {connectionMessage ?? "The voice connection stopped."} <span className="text-muted">Everything you recorded is saved.</span>
               </p>
             ) : (
-              <p className="text-lg text-muted">Starts the microphone and BenchMate&apos;s voice. Everything you log is saved in this browser.</p>
+              <>
+                <p className="text-lg text-text">Ready when you are.</p>
+                <p className="text-muted">Press the button, allow the microphone, then just talk. Say &ldquo;start&rdquo; to hear step 1.</p>
+              </>
             )}
           </div>
         </section>
       )}
 
-      <FirstRunTips />
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
-        <div className="flex min-w-0 flex-col gap-4">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="flex min-w-0 flex-col gap-5">
           <StepCard session={session} />
           <CaptionStrip />
-          {live && <VoiceLevelMeter />}
+          {live && <VoiceLevelMeter className="opacity-80" />}
         </div>
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-5">
           <TimerPanel timers={session.timers} onDismiss={ctl.dismissTimer} />
           <LogFeed entries={session.entries} />
+          <FirstRunTips />
           {showDebug && <DebugPanel onSendText={ctl.sendText} canSend={live} inputRef={textRef} />}
         </div>
       </div>
 
-      <p className="no-print text-center text-xs text-muted">Keys: Space mute · ← → steps · T type instead of speaking · D debug</p>
+      <p className="no-print text-center text-xs text-faint">Keyboard: Space mute · ← → change step · T type instead of speaking · D developer panel</p>
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} onVolume={ctl.setVolume} />
     </main>
@@ -217,8 +224,8 @@ function ElapsedClock({ since }: { since: string }) {
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   return (
-    <span className="font-mono text-lg tabular-nums text-muted" title="Session time">
-      {h ? `${h}:` : ""}
+    <span className="tabular-nums" title="Session time">
+      Running for {h ? `${h}:` : ""}
       {String(m).padStart(2, "0")}:{String(sec).padStart(2, "0")}
     </span>
   );

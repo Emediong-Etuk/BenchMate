@@ -22,9 +22,9 @@ export function DebugPanel({ onSendText, canSend, inputRef }: Props) {
   }, [log]);
 
   return (
-    <section className="no-print flex min-h-0 flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+    <section className="no-print flex min-h-0 flex-col gap-3 rounded-3xl border border-border bg-surface p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Debug · events</h2>
+        <h2 className="font-semibold text-text">Developer panel</h2>
         <button type="button" onClick={clearLog} className="rounded-lg px-3 py-1 text-sm text-muted hover:bg-surface-2">
           Clear
         </button>
@@ -42,14 +42,14 @@ export function DebugPanel({ onSendText, canSend, inputRef }: Props) {
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={canSend ? "Type what you'd say… (T)" : "Connect first"}
+          placeholder={canSend ? "Type what you'd say… (T)" : "Start listening first"}
           disabled={!canSend}
-          className="min-h-12 flex-1 rounded-xl border border-border bg-bg px-3 text-base disabled:opacity-50"
+          className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-bg px-3 text-base text-text placeholder:text-faint disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={!canSend || !text.trim()}
-          className="min-h-12 rounded-xl bg-accent px-4 font-semibold text-white disabled:opacity-40 dark:text-black"
+          className="min-h-12 rounded-xl bg-accent px-4 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-40"
         >
           Send
         </button>

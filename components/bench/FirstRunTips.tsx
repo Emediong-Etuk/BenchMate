@@ -13,11 +13,27 @@ function read(): boolean {
   }
 }
 
-const PHRASES = ['"Next"', '"Say that again"', '"Sample 2, 245 nanograms per microliter"', '"Ten-minute timer"', '"Scratch that"', '"I\'m done"'];
+function write(collapsed: boolean) {
+  try {
+    if (collapsed) localStorage.setItem(KEY, "1");
+    else localStorage.removeItem(KEY);
+  } catch {
+    // ignore
+  }
+  listeners.forEach((l) => l());
+}
 
-/** Example phrases on first use; dismissal remembered locally. */
+const GROUPS: [string, string[]][] = [
+  ["Move", ["“Start”", "“Next”", "“Go back”", "“Say that again”"]],
+  ["Record", ["“Sample 2, 245 nanograms per microliter”", "“Tube 4 looks cloudy”"]],
+  ["Timers", ["“Ten-minute timer”", "“How long is left?”"]],
+  ["Fix", ["“Scratch that”", "“No, 254 not 245”"]],
+  ["Finish", ["“I’m done”"]],
+];
+
+/** "What can I say?" card. Open on first use; collapsing it is remembered in this browser. */
 export function FirstRunTips() {
-  const dismissed = useSyncExternalStore(
+  const collapsed = useSyncExternalStore(
     (cb) => {
       listeners.add(cb);
       return () => listeners.delete(cb);
@@ -25,29 +41,34 @@ export function FirstRunTips() {
     read,
     () => true,
   );
-  if (dismissed) return null;
   return (
-    <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-accent bg-accent-soft px-4 py-3">
-      <span className="font-semibold">Try saying:</span>
-      {PHRASES.map((p) => (
-        <span key={p} className="rounded-full bg-surface px-3 py-1 text-sm">
-          {p}
-        </span>
-      ))}
+    <section className="rounded-3xl border border-border bg-surface">
       <button
         type="button"
-        className="ml-auto min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-surface"
-        onClick={() => {
-          try {
-            localStorage.setItem(KEY, "1");
-          } catch {
-            // ignore
-          }
-          listeners.forEach((l) => l());
-        }}
+        onClick={() => write(!collapsed)}
+        aria-expanded={!collapsed}
+        className="flex w-full items-center justify-between gap-3 rounded-3xl px-5 py-4 text-left"
       >
-        Got it
+        <span className="font-semibold text-text">What can I say?</span>
+        <span className="text-sm text-muted">{collapsed ? "Show" : "Hide"}</span>
       </button>
+      {!collapsed && (
+        <div className="flex flex-col gap-3 px-5 pb-5">
+          {GROUPS.map(([label, phrases]) => (
+            <div key={label} className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-faint">{label}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {phrases.map((p) => (
+                  <span key={p} className="rounded-full bg-surface-2 px-3 py-1 text-sm text-muted">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+          <p className="pt-1 text-sm text-faint">Speak naturally. You can interrupt BenchMate any time.</p>
+        </div>
+      )}
     </section>
   );
 }

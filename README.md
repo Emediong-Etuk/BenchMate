@@ -16,7 +16,7 @@ BenchMate is a hands-free voice lab assistant for bench scientists, built on the
 | "Louder" | Raises the agent's volume |
 | "I'm done" | Confirms, ends the session, shows a clean notebook entry |
 
-**Live demo:** https://bench-mate-rho.vercel.app
+**Live demo:** https://bench-mate-rho.vercel.app (the About page there explains everything in plain language).
 
 **Data integrity comes first.** The app, not the LLM, holds the protocol, your position and every logged value. The agent changes them only through tools. Every value is read back. Nothing is hard-deleted. The notebook entry is generated deterministically from the log, never written by an LLM.
 
@@ -33,7 +33,7 @@ BenchMate is a hands-free voice lab assistant for bench scientists, built on the
 
 1. (0:00) Title card: "Gloves on. Hands full. Notebook still gets written."
 2. (0:05) Show the problem: scribbled glove, paper towel with numbers.
-3. (0:12) Load "Demo: Mock bench run". Put gloves on. Say "Start."
+3. (0:12) Click "Try the practice run", then "Start at the bench" and "Start listening". Put gloves on. Say "Start."
 4. (0:18) "Next" through two steps; interrupt a long step with "wait, say that again".
 5. (0:30) "Sample one, 182 nanograms per microliter, 260 over 280 is 1.91." Readback.
 6. (0:40) "Sample two, 245." It asks for the unit. "Nanograms per microliter." Readback.
@@ -86,7 +86,7 @@ Use laptop speakers, not headphones: the browser's echo cancellation keeps Bench
 11. Reload the page mid-run → state restored.
 12. "I'm done" → confirmation → entry page with everything correct. Repeat 5 and 9 with a running fan or white-noise video nearby to simulate a centrifuge.
 
-Keyboard fallbacks on the bench screen: **Space** mute · **← →** steps · **T** type instead of speaking · **D** debug panel (event log + typed input, useful as an on-stage backup if the mic fails).
+Keyboard fallbacks on the bench screen: **Space** mute · **← →** steps · **T** type instead of speaking · **D** developer panel (event log + typed input, useful as an on-stage backup if the mic fails).
 
 ## Architecture
 
@@ -116,8 +116,8 @@ Keyboard fallbacks on the bench screen: **Space** mute · **← →** steps · *
 
 | Path | What lives there |
 |---|---|
-| `app/` | Pages (home, setup, bench, entry, passcode), API routes, error pages |
-| `components/` | Bench (step card, log feed, timers, captions, settings, debug), setup, entry |
+| `app/` | Pages (home, about, setup, bench, entry, passcode), API routes, error pages |
+| `components/` | Bench (step card, log feed, timers, captions, settings, debug), setup, entry, shared UI (site header, buttons, banner) |
 | `lib/voice/` | `VoiceClient`, capture/playback, PCM helpers, event schemas, result queue, proactive speech, reconnect policy |
 | `lib/agent/` | Tool schemas and handlers, commit ledger, system prompt, session config, keyterms, units, speakable text, timers |
 | `lib/protocol/` | Types, samples, LLM parse pipeline, rule-based parser, quantity check |

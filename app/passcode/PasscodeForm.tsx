@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { buttonClass } from "@/components/ui/button";
 
 export function PasscodeForm() {
   const router = useRouter();
@@ -38,9 +39,9 @@ export function PasscodeForm() {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         aria-label="Passcode"
-        className="min-h-16 rounded-2xl border-2 border-border bg-surface px-4 text-xl"
+        className="min-h-14 rounded-2xl border border-border bg-surface px-4 text-xl text-text"
       />
-      <button type="submit" disabled={busy || !value} className="min-h-16 rounded-2xl bg-accent text-xl font-semibold text-white disabled:opacity-40 dark:text-black">
+      <button type="submit" disabled={busy || !value} className={buttonClass("primary", "lg", "min-h-14")}>
         {busy ? "Checking…" : "Enter"}
       </button>
       {error && (
