@@ -2,9 +2,9 @@
 
 ## Status
 
-Phases 0–7 built and verified (see the commit history and README). Remaining: deploy to Vercel (needs the owner's Vercel account) and the real-laptop checks listed in the README.
+Phases 0–7 are built, verified and merged into `main`, and deployed on Vercel at https://bench-mate-rho.vercel.app. The live site passed the full voice script, including the correction fix from live testing (NOTES C17). Remaining: the real-laptop checks in the README's manual voice test script (barge-in and back-channel over speakers, the chime, a real Wi-Fi drop, the reload overlay, background noise).
 
-Read with `NOTES.md` (verified API facts and the contradictions with the brief). **Waiting for approval before Phase 1.**
+Read with `NOTES.md` (verified API facts and the contradictions with the brief). This is the plan as approved before Phase 1; it is kept for reference.
 
 ## Dependencies (unchanged from brief §3, no additions)
 
@@ -134,7 +134,9 @@ Each phase ends with `npm run typecheck && npm run lint && npm test` green, a co
 - Glanceability pass, dark mode, passcode gate, README (setup, architecture diagram, verbatim demo script, manual test script, privacy statement, known limitations), Vercel deploy.
 - ✅ Deployed HTTPS URL works in a fresh profile. I can't deploy to Vercel from this container without your Vercel account, so either you connect the repo in Vercel or you give me a token. I'll prepare everything else.
 
-## Open questions (need your call)
+## Open questions (answered)
+
+Answers: Q1 (a), qwen now, `LLM_GATEWAY_MODEL` to switch. Q2 yes, fresh-session reconnect is the tested path. Q3 yes, both prompt edits. Q4 the key has been rotated.
 
 **Q1: LLM Gateway model.** This API key only reaches `qwen3.5-4b-32k-fast`, which doesn't support `response_format`. It still returned correct JSON when prompted, and json-repair + zod + number check + fallback cover failures. Options: (a) proceed with qwen now and switch to `claude-sonnet-4-6` via env var once the account has access (**recommended**; the code handles both); (b) you enable Claude/Gemini access on the account first so the demo shows true structured outputs.
 

@@ -16,6 +16,8 @@ BenchMate is a hands-free voice lab assistant for bench scientists, built on the
 | "Louder" | Raises the agent's volume |
 | "I'm done" | Confirms, ends the session, shows a clean notebook entry |
 
+**Live demo:** https://bench-mate-rho.vercel.app
+
 **Data integrity comes first.** The app, not the LLM, holds the protocol, your position and every logged value. The agent changes them only through tools. Every value is read back. Nothing is hard-deleted. The notebook entry is generated deterministically from the log, never written by an LLM.
 
 ## AssemblyAI features used
@@ -46,7 +48,7 @@ BenchMate is a hands-free voice lab assistant for bench scientists, built on the
 Requirements: Node.js 20.9+, Chrome or Edge (desktop). The microphone needs `localhost` or HTTPS.
 
 ```bash
-git clone -b claude/vibrant-thompson-evxrno https://github.com/Emediong-Etuk/BenchMate.git
+git clone https://github.com/Emediong-Etuk/BenchMate.git
 cd BenchMate
 npm install
 cp .env.example .env.local      # Windows: copy .env.example .env.local
@@ -64,7 +66,7 @@ Use laptop speakers, not headphones: the browser's echo cancellation keeps Bench
 
 ## Deploy to Vercel
 
-1. Push the branch, then **Add New → Project** in Vercel and import the repo (framework: Next.js, no build settings needed).
+1. In Vercel, choose **Add New → Project** and import the repo (framework: Next.js, no build settings needed).
 2. Add the environment variables above (Production and Preview). Set `DEMO_PASSCODE` for a public demo URL.
 3. Deploy. The mic works because Vercel serves HTTPS.
 4. Open the URL in a fresh browser profile and run the manual voice test script below.
