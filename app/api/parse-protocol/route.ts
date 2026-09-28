@@ -3,7 +3,8 @@ import { buildParseResult } from "@/lib/protocol/buildProtocol";
 import { fallbackParse } from "@/lib/protocol/fallbackParser";
 import { runParsePipeline } from "@/lib/protocol/parsePipeline";
 import { ParseRequestSchema, type LlmProtocol } from "@/lib/protocol/schema";
-import { clientIp, createRateLimiter } from "@/lib/server/rateLimit";
+import { createRateLimiter } from "@/lib/server/rateLimit";
+import { requireUser } from "@/lib/server/requireUser";
 
 // POST { text, title?, source? } → ParseResult (brief §11.2).
 
@@ -18,7 +19,9 @@ function json(body: unknown, status = 200) {
 }
 
 export async function POST(request: Request) {
-  const limit = limiter.check(clientIp(request.headers));
+  const a = await requireUser(request);
+  if (!a.ok) return a.response;
+  const limit = limiter.check(a.userId);
   if (!limit.ok) return json({ error: `Too many parse requests. Try again in ${Math.ceil(limit.retryAfterMs / 1000)} s.` }, 429);
 
   const body = await request.json().catch(() => null);

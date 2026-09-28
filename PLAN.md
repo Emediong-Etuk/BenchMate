@@ -4,6 +4,8 @@
 
 Phases 0–7 are built, verified and merged into `main`, and deployed on Vercel at https://bench-mate-rho.vercel.app. The live site passed the full voice script, including the correction fix from live testing (NOTES C17). Remaining: the real-laptop checks in the README's manual voice test script (barge-in and back-channel over speakers, the chime, a real Wi-Fi drop, the reload overlay, background noise).
 
+**After launch (owner request):** Google sign-in accounts, a per-user dashboard, and Postgres storage replaced the browser-only design and the passcode gate. See NOTES.md "Owner decision after launch: accounts" and the README.
+
 Read with `NOTES.md` (verified API facts and the contradictions with the brief). This is the plan as approved before Phase 1; it is kept for reference.
 
 ## Dependencies (unchanged from brief §3, no additions)

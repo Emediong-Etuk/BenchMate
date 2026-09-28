@@ -35,8 +35,8 @@ export function SetupClient() {
         <SiteHeader />
         <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-20">
           <h1 className="text-2xl font-semibold">No protocol chosen yet</h1>
-          <p className="text-muted">Pick the practice run or one of the protocols on the home screen first.</p>
-          <Link href="/" className={buttonClass("primary", "lg", "w-fit")}>
+          <p className="text-muted">Pick the practice run or one of the protocols on your dashboard first.</p>
+          <Link href="/dashboard" className={buttonClass("primary", "lg", "w-fit")}>
             Choose a protocol
           </Link>
         </main>
@@ -65,7 +65,7 @@ export function SetupClient() {
       <SiteHeader />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-16 pt-10 sm:px-6">
         <header className="fade-up flex flex-col gap-3">
-          <Link href="/" className="w-fit text-sm text-muted hover:text-text">
+          <Link href="/dashboard" className="w-fit text-sm text-muted hover:text-text">
             ← Back to protocols
           </Link>
           <h1 className="text-3xl font-semibold tracking-tight">Get ready</h1>
@@ -174,7 +174,7 @@ export function SetupClient() {
 
             {activeSession && (
               <Banner tone="warn" title="Another session is still open">
-                Starting this one leaves &ldquo;{activeSession.protocol.title}&rdquo; unfinished in your past sessions.
+                Starting this one leaves &ldquo;{activeSession.protocol.title}&rdquo; unfinished in your sessions.
               </Banner>
             )}
 

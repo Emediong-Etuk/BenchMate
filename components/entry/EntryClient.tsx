@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildEntryModel, type Table } from "@/lib/notebook/entryModel";
 import { exportFileBase, generateJson, renderMarkdown } from "@/lib/notebook/generateEntry";
 import { buttonClass } from "@/components/ui/button";
@@ -44,9 +44,23 @@ export function EntryClient({ sessionId }: { sessionId: string }) {
   const session = useBenchStore((s) => s.sessions.find((x) => x.id === sessionId));
   const activeId = useBenchStore((s) => s.activeSessionId);
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
+  const [lookup, setLookup] = useState<"loading" | "ok" | "missing" | "error">("loading");
   const model = useMemo(() => (session ? buildEntryModel(session) : null), [session]);
 
-  if (!hydrated)
+  // Older sessions aren't kept in memory; fetch this one from the account.
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+    void useBenchStore
+      .getState()
+      .loadSession(sessionId)
+      .then((r) => !cancelled && setLookup(r));
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, sessionId]);
+
+  if (!hydrated || (!session && lookup === "loading"))
     return (
       <>
         <SiteHeader />
@@ -58,10 +72,14 @@ export function EntryClient({ sessionId }: { sessionId: string }) {
       <>
         <SiteHeader />
         <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-20">
-          <h1 className="text-2xl font-semibold">Notebook entry not found</h1>
-          <p className="text-muted">It may have been deleted, or it was recorded in a different browser. Entries are stored only in the browser that ran the session.</p>
-          <Link href="/" className={buttonClass("primary", "lg", "w-fit")}>
-            Home
+          <h1 className="text-2xl font-semibold">{lookup === "error" ? "Couldn't load this entry" : "Notebook entry not found"}</h1>
+          <p className="text-muted">
+            {lookup === "error"
+              ? "Check your connection and try again."
+              : "It may have been deleted, or it belongs to a different account."}
+          </p>
+          <Link href="/dashboard" className={buttonClass("primary", "lg", "w-fit")}>
+            Back to your dashboard
           </Link>
         </main>
       </>
@@ -81,7 +99,7 @@ export function EntryClient({ sessionId }: { sessionId: string }) {
           <p className="font-semibold text-text">{session.endedAt ? "Your notebook entry is ready." : "This session is still in progress."}</p>
           <p className="text-muted">
             {session.endedAt
-              ? "It's built straight from what you recorded. Save a copy, since it lives only in this browser."
+              ? "It's built straight from what you recorded and saved privately to your account."
               : "What you see below is the entry so far."}
           </p>
         </div>

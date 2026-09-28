@@ -60,14 +60,26 @@ npm run dev                     # http://localhost:3000
 |---|---|---|
 | `ASSEMBLYAI_API_KEY` | yes | Server-only. Never sent to the browser (`npm run check:secrets` verifies the build). |
 | `LLM_GATEWAY_MODEL` | no | Protocol parser model. Default `claude-sonnet-4-6`. Use a model your account can access. We developed on `qwen3.5-4b-32k-fast` (see [NOTES.md](NOTES.md) C4). |
-| `DEMO_PASSCODE` | no | If set, the whole app (pages and API) sits behind this passcode. |
+| `AUTH_SECRET` | yes | Signs the sign-in cookie. Generate with `npx auth secret` or `openssl rand -base64 33`. |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | yes | Google OAuth client (see "Google sign-in" below). |
+| `DATABASE_URL` | yes | Postgres connection string (Neon). Migrations run automatically before `next build`; locally run `npm run db:migrate`. |
+
+### Google sign-in
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create a project, then **Configure consent screen** (External, app name "BenchMate", your support email; the default `openid email profile` scopes are all BenchMate uses).
+2. **Create credentials → OAuth client ID → Web application.**
+3. Authorized JavaScript origins: your site (e.g. `https://bench-mate-rho.vercel.app`) and `http://localhost:3000`.
+4. Authorized redirect URIs: `https://<your site>/api/auth/callback/google` and `http://localhost:3000/api/auth/callback/google`.
+5. Copy the client ID and secret into `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.
+6. While the consent screen is in "Testing", only the test users you list can sign in. Publish it (no Google review is needed for these basic scopes) to let anyone sign up.
 
 Use laptop speakers, not headphones: the browser's echo cancellation keeps BenchMate from hearing itself.
 
 ## Deploy to Vercel
 
 1. In Vercel, choose **Add New → Project** and import the repo (framework: Next.js, no build settings needed).
-2. Add the environment variables above (Production and Preview). Set `DEMO_PASSCODE` for a public demo URL.
+2. **Storage → Connect Database → Neon (Postgres)**. This sets `DATABASE_URL` for the project.
+3. Add `ASSEMBLYAI_API_KEY`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` (and optionally `LLM_GATEWAY_MODEL`) for Production and Preview.
 3. Deploy. The mic works because Vercel serves HTTPS.
 4. Open the URL in a fresh browser profile and run the manual voice test script below.
 
@@ -102,27 +114,27 @@ Keyboard fallbacks on the bench screen: **Space** mute · **← →** steps · *
 │    ├─ proactive speech gate (timer announcements, rollover)            │
 │    └─ reconnect: fresh token → resume → fresh session + state summary  │
 │  Playback: scheduled 24 kHz buffers, duck on speech, flush on barge-in │
-│  Store: protocol, session, entries, timers, transcript → localStorage  │
+│  Store: working copy → synced to the account (+ per-user local cache)  │
 └──────────────┬─────────────────────────────────┬───────────────────────┘
                │ GET /api/voice-token            │ POST /api/parse-protocol
 ┌──────────────▼─────────────────────────────────▼───────────────────────┐
 │ Next.js route handlers (hold ASSEMBLYAI_API_KEY)                       │
 │  - mint single-use tokens (rate-limited)                               │
 │  - LLM Gateway parse → zod → quantity check → rule-based rescue        │
-│ proxy.ts: optional DEMO_PASSCODE gate (signed cookie)                  │
+│ proxy.ts: sign-in gate · Auth.js (Google) · Postgres (per-user rows)   │
 └────────────────────────────────────────────────────────────────────────┘
        Browser ⇄ wss://agents.assemblyai.com/v1/ws?token=…  (direct)
 ```
 
 | Path | What lives there |
 |---|---|
-| `app/` | Pages (home, about, setup, bench, entry, passcode), API routes, error pages |
+| `app/` | Pages (home, about, sign-in, dashboard, setup, bench, entry), API routes, error pages |
 | `components/` | Bench (step card, log feed, timers, captions, settings, debug), setup, entry, shared UI (site header, buttons, banner) |
 | `lib/voice/` | `VoiceClient`, capture/playback, PCM helpers, event schemas, result queue, proactive speech, reconnect policy |
 | `lib/agent/` | Tool schemas and handlers, commit ledger, system prompt, session config, keyterms, units, speakable text, timers |
 | `lib/protocol/` | Types, samples, LLM parse pipeline, rule-based parser, quantity check |
 | `lib/notebook/` | Deterministic entry model + Markdown/JSON export |
-| `lib/store/` | zustand stores and localStorage persistence |
+| `lib/store/` | zustand stores, account sync and the per-user local cache |
 | `tests/` | Vitest unit tests (tool handlers, ledger sequences, schemas, parsers, notebook snapshot, …) |
 
 ## Scripts
@@ -134,12 +146,16 @@ Keyboard fallbacks on the bench screen: **Space** mute · **← →** steps · *
 | `npm run typecheck` | `tsc --noEmit` (strict) |
 | `npm run lint` | ESLint (Next config) |
 | `npm test` | Vitest unit tests |
-| `npm run check:secrets` | After a build: fails if the API key or its variable name is in client-facing output |
+| `npm run check:secrets` | After a build: fails if a server secret (AssemblyAI key, auth secrets, database URL) or its variable name is in client-facing output |
+| `npm run db:migrate` | Applies database migrations (also runs automatically before `next build`) |
+| `npm run db:generate` | Generates a new migration after changing `lib/db/schema.ts` |
 | `npm run probe` | Logs real Voice Agent API payloads (`scripts/probe-voice.mjs`) |
 
 ## Privacy
 
-Lab data (protocols, logged values, transcripts, notebook entries) stays in this browser's local storage. Audio is sent to AssemblyAI only for the live voice session, and pasted protocol text only for parsing. The API key never leaves the server; the browser only gets single-use tokens that expire in 120 seconds. There are no accounts, databases or cloud storage.
+Everyone signs in with Google (the only sign-up method). BenchMate stores the user's name, email and profile picture, plus their protocols, sessions and notebook entries, in Postgres. Every row belongs to one user, and every query is filtered by the signed-in user's id taken from the server-side session, never from the request; another user's session id answers 404. Users can delete any session, or their whole account (which deletes everything in it), from the dashboard.
+
+A per-user cache in the browser keeps a run going through reloads and short network drops; it's cleared on sign-out. Audio is sent to AssemblyAI only for the live voice session, and pasted protocol text only for parsing. All secrets stay on the server; the browser only gets single-use voice tokens that expire in 120 seconds. Every API route requires sign-in, which also keeps strangers from spending the AssemblyAI credit.
 
 ## What we learned about the API (and changed from the brief)
 
@@ -155,7 +171,7 @@ The build follows the brief except where the live API behaved differently. Every
 ## Known limitations
 
 - Chrome and Edge on desktop are the supported browsers. Firefox should work (it resamples at the device rate), Safari is untested.
-- Sessions live in one browser's local storage; clearing site data deletes them. Export entries (Markdown/JSON) to keep them.
+- The dashboard loads your 30 most recent sessions in full; older ones load when you open them.
 - After a page reload the browser may need one tap to resume audio (autoplay policy); BenchMate shows a full-screen prompt.
 - The small LLM Gateway model available on our account sometimes drops protocol steps; the quantity check catches it and falls back to the rule-based split. A stronger model (for example `claude-sonnet-4-6`) gives better parses.
 - The agent's model occasionally misfiles free talk as an observation; everything is visible in the log and can be voided.

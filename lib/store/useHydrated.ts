@@ -1,13 +1,18 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useBenchStore } from "./benchStore";
 
-/** Loads persisted state on the client (after first render, so SSR markup matches). */
+/**
+ * Loads the signed-in user's data (after first render, so SSR markup
+ * matches). Signed-out visitors never trigger a load.
+ */
 export function useHydratedBenchStore(): boolean {
   const hydrated = useBenchStore((s) => s.hydrated);
+  const { status } = useSession();
   useEffect(() => {
-    useBenchStore.getState().hydrate();
-  }, []);
+    if (status === "authenticated") void useBenchStore.getState().hydrate();
+  }, [status]);
   return hydrated;
 }

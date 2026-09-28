@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree } from "next/font/google";
+import { auth } from "@/auth";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
 
 // A soft, rounded sans that reads calmly at large sizes.
@@ -18,14 +20,17 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
   return (
     <html lang="en" className={figtree.variable}>
       <body className="flex min-h-dvh flex-col">
-        <div className="flex flex-1 flex-col">{children}</div>
+        <AuthProvider session={session}>
+          <div className="flex flex-1 flex-col">{children}</div>
+        </AuthProvider>
         <footer className="no-print px-4 py-5 text-center text-xs leading-relaxed text-faint">
-          Your lab data stays in this browser. Audio and protocol text are sent to AssemblyAI only for the live session and for reading pasted
-          protocols.
+          Your sessions are private to your account. Audio and protocol text are sent to AssemblyAI only for the live session and for reading
+          pasted protocols.
         </footer>
       </body>
     </html>

@@ -12,6 +12,7 @@ function memoryStorage(opts: { failWrites?: boolean } = {}): StorageLike & { dat
       if (opts.failWrites) throw new DOMException("quota", "QuotaExceededError");
       data.set(k, v);
     },
+    removeItem: (k) => void data.delete(k),
   };
 }
 

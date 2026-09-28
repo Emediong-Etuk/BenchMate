@@ -1,26 +1,30 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { PASS_COOKIE, verifyPass } from "@/lib/server/passcode";
+import NextAuth from "next-auth";
+import { NextResponse } from "next/server";
+import { authConfig } from "./auth.config";
 
-// Optional demo passcode gate (brief §15). With DEMO_PASSCODE unset this is a
-// no-op. Pages redirect to /passcode; API routes answer 401.
+// Sign-in gate. Home, About and the sign-in page are public; every other page
+// redirects to /signin, and every API route (except Auth.js's own) answers
+// 401. Routes check the user again themselves.
 
-export async function proxy(request: NextRequest) {
-  const secret = process.env.DEMO_PASSCODE;
-  if (!secret) return NextResponse.next();
+const PUBLIC_PAGES = new Set(["/", "/about", "/signin"]);
 
-  const { pathname, search } = request.nextUrl;
-  if (pathname === "/passcode" || pathname === "/api/passcode") return NextResponse.next();
+const { auth } = NextAuth(authConfig);
 
-  if (await verifyPass(secret, request.cookies.get(PASS_COOKIE)?.value)) return NextResponse.next();
+export const proxy = auth((req) => {
+  const { pathname, search } = req.nextUrl;
+  if (pathname.startsWith("/api/auth/")) return NextResponse.next();
+  const signedIn = Boolean(req.auth?.user);
+
+  if (pathname === "/signin" && signedIn) return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  if (PUBLIC_PAGES.has(pathname) || signedIn) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "Enter the demo passcode first." }, { status: 401 });
+    return NextResponse.json({ error: "Please sign in." }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
-  const url = request.nextUrl.clone();
-  url.pathname = "/passcode";
-  url.search = `?next=${encodeURIComponent(pathname + search)}`;
+  const url = new URL("/signin", req.nextUrl);
+  url.searchParams.set("callbackUrl", pathname + search);
   return NextResponse.redirect(url);
-}
+});
 
 export const config = {
   // Everything except static assets and files.

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { clientIp, createRateLimiter } from "@/lib/server/rateLimit";
+import { createRateLimiter } from "@/lib/server/rateLimit";
+import { requireUser } from "@/lib/server/requireUser";
 
-// Mints a single-use Voice Agent API token (NOTES.md §2 Auth). The API key
-// never leaves this handler.
+// Mints a single-use Voice Agent API token (NOTES.md §2 Auth) for a signed-in
+// user. The API key never leaves this handler.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,13 +20,16 @@ function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
 }
 
 export async function GET(request: Request) {
+  const a = await requireUser(request);
+  if (!a.ok) return a.response;
+
   const apiKey = process.env.ASSEMBLYAI_API_KEY;
   if (!apiKey) {
     console.error("[voice-token] ASSEMBLYAI_API_KEY is not set");
     return json({ error: "Voice service is not configured on the server." }, 500);
   }
 
-  const limit = limiter.check(clientIp(request.headers));
+  const limit = limiter.check(a.userId);
   if (!limit.ok) {
     const seconds = Math.ceil(limit.retryAfterMs / 1000);
     return json({ error: `Too many connection attempts. Try again in ${seconds} s.` }, 429, {

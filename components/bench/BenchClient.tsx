@@ -9,6 +9,7 @@ import { useVoiceStore } from "@/lib/store/voiceStore";
 import { buttonClass } from "@/components/ui/button";
 import { Logo } from "@/components/ui/Logo";
 import { SiteHeader } from "@/components/ui/SiteHeader";
+import { SyncBadge } from "@/components/ui/SyncBadge";
 import { CaptionStrip } from "./CaptionStrip";
 import { DebugPanel } from "./DebugPanel";
 import { FirstRunTips } from "./FirstRunTips";
@@ -93,8 +94,8 @@ export function BenchClient() {
         <SiteHeader />
         <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-20">
           <h1 className="text-2xl font-semibold">No session running</h1>
-          <p className="text-muted">Choose a protocol on the home screen, check the steps, then press Start.</p>
-          <Link href="/" className={buttonClass("primary", "lg", "w-fit")}>
+          <p className="text-muted">Choose a protocol on your dashboard, check the steps, then press Start.</p>
+          <Link href="/dashboard" className={buttonClass("primary", "lg", "w-fit")}>
             Choose a protocol
           </Link>
         </main>
@@ -105,13 +106,14 @@ export function BenchClient() {
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-4 sm:px-6">
       <header className="flex flex-wrap items-center gap-3 border-b border-border/70 pb-4">
-        <Link href="/" className="rounded-xl" title="Home (your session keeps its place)" aria-label="BenchMate home">
+        <Link href="/dashboard" className="rounded-xl" title="Dashboard (your session keeps its place)" aria-label="BenchMate dashboard">
           <Logo compact />
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-semibold text-text">{session.protocol.title}</h1>
-          <p className="text-sm text-faint">
+          <p className="flex flex-wrap items-center gap-x-1 text-sm text-faint">
             <ElapsedClock since={session.startedAt} />
+            <SyncBadge className="px-2 py-0 text-faint" />
           </p>
         </div>
         <StatusPill />

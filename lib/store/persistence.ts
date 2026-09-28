@@ -1,10 +1,11 @@
-// localStorage persistence (brief §14): debounced writes, flush on
-// pagehide/visibilitychange, every storage call wrapped in try/catch.
+// localStorage helpers for the per-user cache (brief §14): debounced writes,
+// flush on pagehide/visibilitychange, every storage call wrapped in try/catch.
 
+/** The pre-accounts key. Left untouched in the browser and never read. */
 export const STORAGE_KEY = "benchmate:v1";
 const DEBOUNCE_MS = 250;
 
-export type StorageLike = Pick<Storage, "getItem" | "setItem">;
+export type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export function loadJSON<T>(storage: StorageLike | null, key = STORAGE_KEY): T | null {
   if (!storage) return null;

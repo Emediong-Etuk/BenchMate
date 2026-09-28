@@ -35,6 +35,10 @@ Legend: ✅ verified (docs + probe) · 📄 docs only · ⚠️ contradicts the 
 
 | C17 | "Scratch that" voids by utterance group; corrections reuse it | ⚠️ **Found testing the live deployment:** a measurement spoken with a pause arrives as **two turns** (two groups). "No, 254 not 245" then voided the most recent group, which was the *ratio*, not 245, so 245 and 254 both stayed live. | `void_last_entry` takes an optional `value`. A correction passes the wrong number and exactly that reading is voided; plain "scratch that" still voids the last utterance. Verified by voice for both the split-turn and single-turn shapes. |
 
+### Owner decision after launch: accounts
+
+The brief (§21) said "Do not add accounts, databases, or cloud storage." After launch, the project owner chose to add them: sign-in with Google only (Auth.js v5), Postgres on Neon (Drizzle ORM), sign-in required for everything except Home and About, and sessions saved before accounts are ignored (not imported). The data-integrity rules are unchanged: the app, not the LLM, owns the record; nothing is hard-deleted inside a session (only the user can delete a whole session or their account); the notebook is still generated deterministically. The per-user data isolation is covered by `tests/userData.test.ts` (run with `TEST_DATABASE_URL`) and an end-to-end two-account run. The optional `DEMO_PASSCODE` gate was removed, since sign-in now guards every API route.
+
 ## 2. Verified facts
 
 ### Auth / tokens

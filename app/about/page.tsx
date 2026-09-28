@@ -10,8 +10,12 @@ export const metadata: Metadata = {
 
 const SESSION_FLOW = [
   {
+    title: "Sign in with Google",
+    body: "One click creates your account. Everything you do in BenchMate is saved to it and is private to you, so you can pick up on any device.",
+  },
+  {
     title: "Pick a protocol",
-    body: "Start with the practice run, one of the sample protocols, or paste your own. If you paste your own, BenchMate splits it into numbered steps and double-checks that every number from your text (volumes, speeds, times) made it into the steps.",
+    body: "From your dashboard, start with the practice run, one of the sample protocols, or paste your own. If you paste your own, BenchMate splits it into numbered steps and double-checks that every number from your text (volumes, speeds, times) made it into the steps.",
   },
   {
     title: "Check the steps",
@@ -27,7 +31,7 @@ const SESSION_FLOW = [
   },
   {
     title: "Say “I’m done”",
-    body: "BenchMate asks you to confirm, ends the session, and shows your notebook entry. Copy it, download it, or print it to PDF.",
+    body: "BenchMate asks you to confirm, ends the session, and shows your notebook entry. It stays in your account; copy it, download it, or print it to PDF.",
   },
 ];
 
@@ -167,10 +171,11 @@ export default function AboutPage() {
 
         <Section title="Your data and privacy">
           <ul className="flex flex-col gap-3 text-muted">
-            <Point>Protocols, readings, notes and notebook entries are stored only in this browser. There are no accounts and no database.</Point>
+            <Point>You sign in with Google. BenchMate receives only your name, email address and profile picture.</Point>
+            <Point>Your protocols, readings, notes and notebook entries are saved to your account and are private to you. No other user can see them.</Point>
             <Point>Your voice is sent to AssemblyAI only while a session is live, to understand what you say and to speak back.</Point>
             <Point>Pasted protocol text is sent to AssemblyAI once, to split it into steps.</Point>
-            <Point>Clearing your browser&apos;s site data deletes your sessions, so download entries you want to keep.</Point>
+            <Point>You can delete any session, or your whole account and everything in it, from your dashboard at any time.</Point>
           </ul>
         </Section>
 
@@ -205,9 +210,9 @@ export default function AboutPage() {
 
         <section className="flex flex-col items-start gap-4 rounded-3xl border border-accent/30 bg-accent-soft/60 p-8">
           <h2 className="text-xl font-semibold text-text">Ready to try it?</h2>
-          <p className="text-muted">The practice run takes about two minutes and needs nothing but your voice.</p>
-          <Link href="/" className={buttonClass("primary", "lg")}>
-            Go to the start
+          <p className="text-muted">Sign up with Google in one click. The practice run takes about two minutes and needs nothing but your voice.</p>
+          <Link href="/signin?callbackUrl=%2Fdashboard%3Fstart%3Ddemo-mock" className={buttonClass("primary", "lg")}>
+            Get started
           </Link>
         </section>
       </main>

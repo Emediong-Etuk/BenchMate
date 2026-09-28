@@ -70,6 +70,8 @@ export type BenchSession = {
   samples: string[];
   startedAt: string;
   endedAt?: string;
+  /** Last local change; used to reconcile with the account copy. */
+  updatedAt?: string;
   assemblyaiSessionIds: string[];
   currentStep: number; // 0 = not started
   stepEvents: StepEvent[];
