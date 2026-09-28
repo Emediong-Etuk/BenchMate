@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { buttonClass } from "@/components/ui/button";
 import { LevelMeter } from "@/components/ui/LevelMeter";
 import { Capture, CaptureError } from "@/lib/voice/capture";
 import { Playback } from "@/lib/voice/playback";
@@ -54,19 +55,19 @@ export function MicCheck({ autoGainControl, volume }: { autoGainControl: boolean
         <button
           type="button"
           onClick={toggleMic}
-          className={`min-h-14 rounded-2xl border-2 px-5 font-semibold ${running ? "border-accent text-accent" : "border-border"}`}
+          className={buttonClass("secondary", "md", running ? "border-accent text-accent" : "")}
         >
-          {running ? "Stop mic check" : "Check microphone"}
+          {running ? "Stop" : "Test my microphone"}
         </button>
-        <button type="button" onClick={testVoice} className="min-h-14 rounded-2xl border-2 border-border px-5 font-semibold">
-          Test voice
+        <button type="button" onClick={testVoice} className={buttonClass("secondary", "md")}>
+          Play a test sound
         </button>
       </div>
       <LevelMeter level={level} />
       <p className="text-sm text-muted">
         {running
-          ? `Speak normally from where you'll stand. The bar should move well past a third.${rate ? ` (capture at ${rate / 1000} kHz)` : ""}`
-          : "Check the level from your bench position, and make sure the test tone is audible over the room."}
+          ? `Talk normally from where you'll stand. The bar should move well past a third.${rate ? ` (${rate / 1000} kHz)` : ""}`
+          : "Talk and watch the bar move, then play the test sound to check you can hear BenchMate."}
       </p>
       {error && <p className="text-sm text-bad">{error}</p>}
     </div>

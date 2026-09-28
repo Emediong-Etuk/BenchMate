@@ -23,19 +23,19 @@ export function KeytermChips({ terms, onChange, mergedCount }: Props) {
     <div className="flex flex-col gap-3">
       <ul className="flex flex-wrap gap-2">
         {terms.map((t) => (
-          <li key={t} className="flex items-center gap-1 rounded-full border border-border bg-surface-2 py-1 pl-3 pr-1 text-sm">
+          <li key={t} className="flex items-center gap-1 rounded-full bg-surface-3 py-1 pl-3 pr-1 text-sm text-text">
             <span>{t}</span>
             <button
               type="button"
               onClick={() => onChange(terms.filter((x) => x !== t))}
-              className="grid h-7 w-7 place-items-center rounded-full text-muted hover:bg-bg hover:text-bad"
+              className="grid h-7 w-7 place-items-center rounded-full text-faint hover:bg-bg hover:text-bad"
               aria-label={`Remove ${t}`}
             >
               ×
             </button>
           </li>
         ))}
-        {terms.length === 0 && <li className="text-sm text-muted">No protocol-specific terms yet.</li>}
+        {terms.length === 0 && <li className="text-sm text-muted">None yet.</li>}
       </ul>
       <form
         className="flex gap-2"
@@ -47,10 +47,10 @@ export function KeytermChips({ terms, onChange, mergedCount }: Props) {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Add terms, comma-separated (e.g. Buffer P1, Qubit)"
-          className="min-h-12 flex-1 rounded-xl border border-border bg-bg px-3"
+          placeholder="e.g. Buffer P1, Qubit"
+          className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-bg px-3 text-text placeholder:text-faint"
         />
-        <button type="submit" className="min-h-12 rounded-xl border-2 border-border px-4 font-semibold" disabled={!input.trim()}>
+        <button type="submit" className="min-h-11 rounded-xl border border-border-strong px-4 font-semibold hover:border-accent disabled:opacity-40" disabled={!input.trim()}>
           Add
         </button>
       </form>
@@ -58,7 +58,7 @@ export function KeytermChips({ terms, onChange, mergedCount }: Props) {
         <span className={`font-mono ${mergedCount >= MAX_KEYTERMS_TOTAL ? "text-warn" : ""}`}>
           {mergedCount} / {MAX_KEYTERMS_TOTAL}
         </span>{" "}
-        speech keyterms after adding sample names and base lab vocabulary. Keep only rare words: common words dilute the boost.
+        words in use, including sample names and common lab words. Add only rare names (reagents, kits, instruments); everyday words don&apos;t need it.
       </p>
     </div>
   );

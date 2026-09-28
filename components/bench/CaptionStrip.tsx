@@ -20,14 +20,14 @@ export function CaptionStrip() {
 
   const agentText = visibleCaption(caption, now);
   return (
-    <div className="grid gap-2 rounded-2xl border border-border bg-surface p-4 text-xl leading-snug sm:text-2xl" aria-live="off">
-      <p className="min-h-8">
-        <span className="mr-3 align-middle text-sm font-semibold uppercase tracking-wide text-muted">You</span>
-        <span>{userPartial?.text ?? ""}</span>
+    <div className="grid gap-3 rounded-3xl border border-border bg-surface px-6 py-5 text-xl leading-snug sm:text-2xl" aria-live="off">
+      <p className="flex min-h-8 gap-4">
+        <span className="w-24 shrink-0 pt-1.5 text-sm text-faint">You</span>
+        <span className="text-muted">{userPartial?.text ?? ""}</span>
       </p>
-      <p className="min-h-8">
-        <span className="mr-3 align-middle text-sm font-semibold uppercase tracking-wide text-accent">BenchMate</span>
-        <span>{agentText}</span>
+      <p className="flex min-h-8 gap-4">
+        <span className="w-24 shrink-0 pt-1.5 text-sm text-accent">BenchMate</span>
+        <span className="text-text">{agentText}</span>
       </p>
     </div>
   );

@@ -4,11 +4,11 @@ import { deriveStatus, statusPulses, statusTone, type StatusTone } from "@/lib/v
 import { useVoiceStore } from "@/lib/store/voiceStore";
 
 const toneClass: Record<StatusTone, string> = {
-  neutral: "text-muted border-border",
-  accent: "text-accent border-accent",
-  good: "text-good border-good",
-  warn: "text-warn border-warn",
-  bad: "text-bad border-bad",
+  neutral: "text-muted bg-surface-2",
+  accent: "text-accent bg-accent-soft",
+  good: "text-good bg-good/10",
+  warn: "text-warn bg-warn/10",
+  bad: "text-bad bg-bad/10",
 };
 
 export function StatusPill() {
@@ -27,9 +27,9 @@ export function StatusPill() {
     <span
       role="status"
       aria-live="polite"
-      className={`inline-flex min-h-14 items-center gap-3 rounded-full border-2 bg-surface px-5 text-xl font-semibold ${toneClass[tone]}`}
+      className={`inline-flex min-h-12 items-center gap-2.5 rounded-full px-4 text-lg font-medium transition-colors duration-300 ${toneClass[tone]}`}
     >
-      <span className={`h-4 w-4 rounded-full bg-current ${statusPulses(status) ? "pulse-ring" : ""}`} aria-hidden />
+      <span className={`h-3 w-3 rounded-full bg-current ${statusPulses(status) ? "pulse-ring" : ""}`} aria-hidden />
       {status}
     </span>
   );

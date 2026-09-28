@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { buttonClass } from "@/components/ui/button";
 
 // Route-level error boundary: a calm message, never a stack trace (brief §17
 // Phase 6). Lab data lives in localStorage, so it survives a crash.
@@ -16,10 +17,10 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
         Your protocol, log and notebook entries are saved in this browser and are not lost. Try again, or go back to the home screen and resume your session.
       </p>
       <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={reset} className="min-h-14 rounded-2xl bg-accent px-6 text-lg font-semibold text-white dark:text-black">
+        <button type="button" onClick={reset} className={buttonClass("primary", "lg")}>
           Try again
         </button>
-        <Link href="/" className="inline-flex min-h-14 items-center rounded-2xl border-2 border-border px-6 text-lg font-semibold">
+        <Link href="/" className={buttonClass("secondary", "lg")}>
           Home
         </Link>
       </div>

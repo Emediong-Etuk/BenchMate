@@ -6,14 +6,14 @@ export function LevelMeter({ level, muted = false, className = "" }: { level: nu
   const pct = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
   return (
     <div
-      className={`h-3 w-full overflow-hidden rounded-full bg-surface-2 ${className}`}
+      className={`h-2 w-full overflow-hidden rounded-full bg-surface-3 ${className}`}
       role="meter"
       aria-label="Microphone level"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(pct)}
     >
-      <div className={`h-full rounded-full transition-[width] duration-75 ${muted ? "bg-bad" : "bg-accent"}`} style={{ width: `${pct}%` }} />
+      <div className={`h-full rounded-full transition-[width] duration-100 ${muted ? "bg-bad/70" : "bg-accent"}`} style={{ width: `${pct}%` }} />
     </div>
   );
 }

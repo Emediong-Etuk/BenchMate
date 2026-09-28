@@ -25,17 +25,17 @@ export function StepEditor({ steps, onChange }: Props) {
   return (
     <ol className="flex flex-col gap-3">
       {steps.map((step, i) => (
-        <li key={i} className="rounded-2xl border border-border bg-surface p-4">
+        <li key={i} className="rounded-2xl border border-border bg-surface p-4 transition-colors focus-within:border-border-strong">
           <div className="flex items-start gap-3">
-            <span className="mt-2 w-8 shrink-0 text-right font-mono text-lg font-semibold text-muted">{step.number}</span>
+            <span className="mt-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-3 text-sm font-semibold text-muted">{step.number}</span>
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               <textarea
                 value={step.text}
                 onChange={(e) => update(i, { text: e.target.value })}
                 rows={Math.max(2, Math.ceil(step.text.length / 70))}
                 aria-label={`Step ${step.number} text`}
-                placeholder="Describe this step exactly as it should be read aloud"
-                className={`w-full resize-y rounded-xl border bg-bg px-3 py-2 text-base leading-6 ${step.text.trim() ? "border-border" : "border-warn"}`}
+                placeholder="Write this step exactly as it should be read aloud"
+                className={`w-full resize-y rounded-xl border bg-bg px-3 py-2 text-base leading-7 text-text placeholder:text-faint ${step.text.trim() ? "border-border" : "border-warn/60"}`}
               />
               <div className="flex flex-wrap items-center gap-2">
                 <DurationChip seconds={step.durationSeconds} onChange={(d) => update(i, { durationSeconds: d })} />
@@ -60,7 +60,7 @@ export function StepEditor({ steps, onChange }: Props) {
       ))}
       {steps.length === 0 && (
         <li>
-          <button type="button" onClick={() => onChange([{ ...blank(), number: 1 }])} className="min-h-14 rounded-2xl border-2 border-dashed border-border px-5">
+          <button type="button" onClick={() => onChange([{ ...blank(), number: 1 }])} className="min-h-14 rounded-2xl border border-dashed border-border-strong px-5 text-muted hover:border-accent hover:text-text">
             Add the first step
           </button>
         </li>
@@ -77,7 +77,7 @@ function IconButton({ label, onClick, disabled, danger, children }: { label: str
       disabled={disabled}
       aria-label={label}
       title={label}
-      className={`grid h-11 w-11 place-items-center rounded-xl border border-border text-lg disabled:opacity-30 ${danger ? "hover:border-bad hover:text-bad" : "hover:border-accent hover:text-accent"}`}
+      className={`grid h-10 w-10 place-items-center rounded-xl text-lg text-faint transition-colors disabled:opacity-30 ${danger ? "hover:bg-bad/10 hover:text-bad" : "hover:bg-surface-2 hover:text-text"}`}
     >
       {children}
     </button>
@@ -118,9 +118,9 @@ function DurationChip({ seconds, onChange }: { seconds: number | null; onChange:
           placeholder="e.g. 90, 1:30, 5 min"
           aria-label="Step duration"
           aria-invalid={invalid}
-          className={`min-h-11 w-40 rounded-xl border bg-bg px-3 font-mono text-sm ${invalid ? "border-bad" : "border-border"}`}
+          className={`min-h-10 w-40 rounded-xl border bg-bg px-3 text-sm text-text placeholder:text-faint ${invalid ? "border-bad" : "border-border"}`}
         />
-        <button type="submit" className="min-h-11 rounded-xl border border-border px-3 text-sm font-semibold">
+        <button type="submit" className="min-h-10 rounded-xl border border-border-strong px-3 text-sm font-semibold hover:border-accent">
           Set
         </button>
       </form>
@@ -133,9 +133,9 @@ function DurationChip({ seconds, onChange }: { seconds: number | null; onChange:
         setValue(seconds ? String(seconds) : "");
         setEditing(true);
       }}
-      className={`min-h-11 rounded-full border px-4 font-mono text-sm ${seconds ? "border-accent bg-accent-soft text-text" : "border-dashed border-border text-muted"}`}
+      className={`min-h-10 rounded-full border px-4 text-sm ${seconds ? "border-accent/40 bg-accent-soft text-accent-strong" : "border-dashed border-border text-faint hover:text-muted"}`}
     >
-      {seconds ? `⏱ ${formatDuration(seconds)}` : "+ duration"}
+      {seconds ? `⏱ ${formatDuration(seconds)}` : "+ add a time"}
     </button>
   );
 }

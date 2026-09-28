@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Banner } from "@/components/ui/Banner";
+import { buttonClass } from "@/components/ui/button";
+import { SiteHeader } from "@/components/ui/SiteHeader";
 import { formatSampleList, parseSamples } from "@/lib/agent/format";
 import { buildKeyterms } from "@/lib/agent/keyterms";
 import { useBenchStore } from "@/lib/store/benchStore";
@@ -20,16 +22,25 @@ export function SetupClient() {
   const activeSession = useBenchStore((s) => s.sessions.find((x) => x.id === s.activeSessionId && !x.endedAt));
   const store = useBenchStore.getState;
 
-  if (!hydrated) return <main className="p-8 text-muted">Loading…</main>;
+  if (!hydrated)
+    return (
+      <>
+        <SiteHeader />
+        <main className="p-8 text-muted">Loading…</main>
+      </>
+    );
   if (!draft) {
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold">No protocol loaded</h1>
-        <p className="text-muted">Pick a sample or paste your own protocol first.</p>
-        <Link href="/" className="inline-flex min-h-14 w-fit items-center rounded-2xl bg-accent px-6 font-semibold text-white dark:text-black">
-          Choose a protocol
-        </Link>
-      </main>
+      <>
+        <SiteHeader />
+        <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-20">
+          <h1 className="text-2xl font-semibold">No protocol chosen yet</h1>
+          <p className="text-muted">Pick the practice run or one of the protocols on the home screen first.</p>
+          <Link href="/" className={buttonClass("primary", "lg", "w-fit")}>
+            Choose a protocol
+          </Link>
+        </main>
+      </>
     );
   }
 
@@ -50,109 +61,149 @@ export function SetupClient() {
   }
 
   return (
-    <main className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <div className="flex min-w-0 flex-col gap-5">
-        <nav className="text-sm text-muted">
-          <Link href="/" className="hover:text-accent">
-            ← Protocols
+    <>
+      <SiteHeader />
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-16 pt-10 sm:px-6">
+        <header className="fade-up flex flex-col gap-3">
+          <Link href="/" className="w-fit text-sm text-muted hover:text-text">
+            ← Back to protocols
           </Link>
-        </nav>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-semibold uppercase tracking-wide text-muted">Protocol title</span>
-          <input
-            value={protocol.title}
-            onChange={(e) => store().setDraftProtocol({ ...protocol, title: e.target.value })}
-            className="min-h-14 rounded-2xl border border-border bg-surface px-4 text-2xl font-semibold"
-          />
-        </label>
-
-        {draft.missingNumbers.length > 0 && (
-          <Banner
-            tone="warn"
-            title="Some values may have been lost in parsing"
-            action={
-              <button type="button" onClick={() => store().dismissMissingNumbers()} className="min-h-11 rounded-xl border border-border px-4 text-sm font-semibold">
-                I checked
-              </button>
-            }
-          >
-            These values from your text weren&apos;t found in the parsed steps:{" "}
-            <span className="font-mono font-semibold text-text">{draft.missingNumbers.join(", ")}</span>. Please check the steps below.
-          </Banner>
-        )}
-        {draft.parseSource === "fallback" && (
-          <Banner tone="info" title="Parsed with the basic rule-based parser">
-            {draft.note ? `${draft.note} ` : ""}Steps were split on numbering or blank lines. Check the split, and add keyterms and durations by hand.
-          </Banner>
-        )}
-        {draft.parseSource === "llm" && (
-          <p className="text-sm text-muted">Parsed with the AssemblyAI LLM Gateway. Check every step before you start: the notebook will quote them.</p>
-        )}
-
-        <StepEditor steps={protocol.steps} onChange={(steps) => store().setDraftProtocol({ ...protocol, steps })} />
-      </div>
-
-      <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:self-start">
-        <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5">
-          <label className="flex flex-col gap-1">
-            <span className="font-semibold">Samples in this run</span>
-            <input
-              value={draft.samplesInput}
-              onChange={(e) => store().setDraftSamples(e.target.value)}
-              placeholder="e.g. 1-8, control, blank"
-              className="min-h-12 rounded-xl border border-border bg-bg px-3"
-            />
-          </label>
-          <p className="text-sm text-muted">
-            {samples.length ? (
-              <>
-                <span className="font-mono text-text">{formatSampleList(samples)}</span> ({samples.length} {samples.length === 1 ? "sample" : "samples"})
-              </>
-            ) : (
-              "Optional. BenchMate warns when you log a sample that isn't in this list."
-            )}
+          <h1 className="text-3xl font-semibold tracking-tight">Get ready</h1>
+          <p className="max-w-2xl text-lg text-muted">
+            Three quick checks and you&apos;re set. Nothing here is required except the steps themselves.
           </p>
-          <label className="flex flex-col gap-1">
-            <span className="font-semibold">Researcher</span>
-            <input
-              value={researcherName}
-              onChange={(e) => store().setResearcherName(e.target.value)}
-              placeholder="Optional, stored only in this browser"
-              className="min-h-12 rounded-xl border border-border bg-bg px-3"
-            />
-          </label>
-        </section>
+        </header>
 
-        <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5">
-          <h2 className="font-semibold">Speech keyterms</h2>
-          <KeytermChips terms={protocol.keyterms} mergedCount={mergedKeyterms.length} onChange={(keyterms) => store().setDraftProtocol({ ...protocol, keyterms })} />
-        </section>
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_24rem]">
+          {/* 1. Steps */}
+          <section className="flex min-w-0 flex-col gap-5" aria-labelledby="steps-heading">
+            <StageHeading n={1} id="steps-heading" title="Check the steps">
+              BenchMate reads these out word for word. Fix anything that looks wrong.
+            </StageHeading>
 
-        <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5">
-          <h2 className="font-semibold">Mic check</h2>
-          <MicCheck autoGainControl={settings.autoGainControl} volume={settings.volume} />
-        </section>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm text-muted">Protocol name</span>
+              <input
+                value={protocol.title}
+                onChange={(e) => store().setDraftProtocol({ ...protocol, title: e.target.value })}
+                className="min-h-13 rounded-2xl border border-border bg-surface px-4 text-xl font-semibold text-text"
+              />
+            </label>
 
-        {activeSession && (
-          <Banner tone="warn" title="A session is already in progress">
-            Starting a new one leaves &ldquo;{activeSession.protocol.title}&rdquo; unfinished in your recent sessions.
-          </Banner>
-        )}
+            {draft.missingNumbers.length > 0 && (
+              <Banner
+                tone="warn"
+                title="A few numbers may have gone missing"
+                action={
+                  <button type="button" onClick={() => store().dismissMissingNumbers()} className={buttonClass("secondary", "md")}>
+                    I checked
+                  </button>
+                }
+              >
+                These values from your text weren&apos;t found in the steps:{" "}
+                <span className="font-mono font-semibold text-text">{draft.missingNumbers.join(", ")}</span>. Please look them over below.
+              </Banner>
+            )}
+            {draft.parseSource === "fallback" && (
+              <Banner title="Split by numbering and blank lines">
+                {draft.note ? `${draft.note} ` : ""}Check that each step is split where you expect, and add times by hand if needed.
+              </Banner>
+            )}
 
-        <button
-          type="button"
-          onClick={start}
-          disabled={usableSteps === 0}
-          className="min-h-20 rounded-3xl bg-accent px-6 text-xl font-semibold text-white shadow-sm disabled:opacity-40 dark:text-black"
-        >
-          Start at the bench →
-        </button>
-        <p className="-mt-3 text-center text-sm text-muted">
-          {usableSteps} {usableSteps === 1 ? "step" : "steps"}
-          {emptySteps > 0 && ` · ${emptySteps} empty ${emptySteps === 1 ? "step" : "steps"} will be skipped`}
-        </p>
-      </aside>
-    </main>
+            <StepEditor steps={protocol.steps} onChange={(steps) => store().setDraftProtocol({ ...protocol, steps })} />
+          </section>
+
+          <aside className="flex flex-col gap-8 lg:sticky lg:top-6 lg:self-start">
+            {/* 2. Details */}
+            <section className="flex flex-col gap-4" aria-labelledby="details-heading">
+              <StageHeading n={2} id="details-heading" title="A few details">
+                Optional. They make the notebook entry more complete.
+              </StageHeading>
+              <div className="flex flex-col gap-4 rounded-3xl border border-border bg-surface p-5">
+                <label className="flex flex-col gap-1.5">
+                  <span className="font-medium text-text">Which samples are you working with?</span>
+                  <input
+                    value={draft.samplesInput}
+                    onChange={(e) => store().setDraftSamples(e.target.value)}
+                    placeholder="e.g. 1-8, control, blank"
+                    className="min-h-12 rounded-xl border border-border bg-bg px-3 text-text placeholder:text-faint"
+                  />
+                  <span className="text-sm text-muted">
+                    {samples.length ? (
+                      <>
+                        {formatSampleList(samples)} ({samples.length} {samples.length === 1 ? "sample" : "samples"})
+                      </>
+                    ) : (
+                      "Usually numbered tubes. BenchMate mentions it if you record one that isn't on this list."
+                    )}
+                  </span>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="font-medium text-text">Your name</span>
+                  <input
+                    value={researcherName}
+                    onChange={(e) => store().setResearcherName(e.target.value)}
+                    placeholder="Shown on the notebook entry"
+                    className="min-h-12 rounded-xl border border-border bg-bg px-3 text-text placeholder:text-faint"
+                  />
+                </label>
+                <details className="group rounded-xl border border-border bg-bg/50 px-4 py-3">
+                  <summary className="cursor-pointer list-none text-sm font-medium text-muted marker:hidden hover:text-text">
+                    <span className="mr-1 inline-block transition-transform group-open:rotate-90">›</span> Unusual words BenchMate should listen for
+                  </summary>
+                  <div className="mt-3">
+                    <KeytermChips
+                      terms={protocol.keyterms}
+                      mergedCount={mergedKeyterms.length}
+                      onChange={(keyterms) => store().setDraftProtocol({ ...protocol, keyterms })}
+                    />
+                  </div>
+                </details>
+              </div>
+            </section>
+
+            {/* 3. Sound */}
+            <section className="flex flex-col gap-4" aria-labelledby="sound-heading">
+              <StageHeading n={3} id="sound-heading" title="Sound check">
+                Stand where you&apos;ll work and make sure you can hear each other.
+              </StageHeading>
+              <div className="rounded-3xl border border-border bg-surface p-5">
+                <MicCheck autoGainControl={settings.autoGainControl} volume={settings.volume} />
+              </div>
+            </section>
+
+            {activeSession && (
+              <Banner tone="warn" title="Another session is still open">
+                Starting this one leaves &ldquo;{activeSession.protocol.title}&rdquo; unfinished in your past sessions.
+              </Banner>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <button type="button" onClick={start} disabled={usableSteps === 0} className={buttonClass("primary", "xl", "w-full rounded-3xl")}>
+                Start at the bench →
+              </button>
+              <p className="text-center text-sm text-muted">
+                {usableSteps} {usableSteps === 1 ? "step" : "steps"}
+                {emptySteps > 0 && ` · ${emptySteps} empty ${emptySteps === 1 ? "step" : "steps"} will be skipped`}
+              </p>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </>
+  );
+}
+
+function StageHeading({ n, id, title, children }: { n: number; id: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent-soft text-sm font-semibold text-accent">{n}</span>
+      <div className="flex flex-col gap-0.5">
+        <h2 id={id} className="text-lg font-semibold text-text">
+          {title}
+        </h2>
+        <p className="text-[15px] text-muted">{children}</p>
+      </div>
+    </div>
   );
 }
